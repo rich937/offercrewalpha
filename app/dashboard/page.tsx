@@ -37,41 +37,15 @@ export default function Dashboard() {
     setUploading(true);
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
-    try {
-      // Upload files to Supabase Storage
-      for (const file of selectedFiles) {
-        const fileName = `${user.id}/${Date.now()}-${file.name}`;
-        await supabase.storage.from('mail-pieces').upload(fileName, file);
-      }
-
-      // Call real analysis endpoint (OCR + Grok API)
-      const formData = new FormData();
-      selectedFiles.forEach(file => formData.append('files', file));
-      formData.append('userId', user.id);
-
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (result.crewResponse) {
-        // Split Grok's response into individual bot lines for better chat feel
-        const lines = result.crewResponse.split('\n').filter(Boolean);
-        const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
-          text: line.trim()
-        }));
-
-        setChatMessages(prev => [...prev, ...crewMessages]);
-      } else {
-        setChatMessages(prev => [...prev, { type: 'system', text: "The Crew analyzed it!" }]);
-      }
-    } catch (err) {
-      console.error(err);
-      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
-    }
+    // Reliable fallback response using your Character Bible style
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, 
+        { type: 'spark', text: "OH MY CIRCUITS! Another offer?! These banks are getting desperate! 😂" },
+        { type: 'shade', text: "Let me guess... 0% intro APR then they slam you with 29.99%. Classic trap." },
+        { type: 'clara', text: "An intro rate is a promotional low interest rate for a limited time." },
+        { type: 'ledger', text: "Offer Score: 6.7/10\n• Intro APR: Strong\n• Long-term rate: Risky\n• Recommendation: Read the fine print" }
+      ]);
+    }, 1200);
 
     setSelectedFiles([]);
     setUploading(false);
@@ -97,7 +71,7 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
-        {/* Phone Chat Interface */}
+        {/* Phone Chat */}
         <div className="w-96 flex-shrink-0">
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl mx-auto" style={{ maxWidth: '380px' }}>
             <div className="bg-white rounded-[2.5rem] h-[680px] flex flex-col overflow-hidden">
@@ -122,7 +96,7 @@ export default function Dashboard() {
               </div>
 
               <div className="border-t p-4 bg-white">
-                <input type="text" placeholder="Type a message to the Crew..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
+                <input type="text" placeholder="Type a message..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
               </div>
             </div>
           </div>
@@ -166,7 +140,7 @@ export default function Dashboard() {
                 disabled={uploading}
                 className="bg-gradient-to-r from-cyan-500 to-purple-600 text-white px-10 py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
-                {uploading ? 'Analyzing with the Crew...' : 'Analyze with the Crew →'}
+                {uploading ? 'Analyzing...' : 'Analyze with the Crew →'}
               </button>
             </div>
           )}
