@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';   // ← Fixed path
+import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 
 export default function SignUp() {
@@ -11,20 +11,12 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track page view
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', 'page_view', {
-        page_title: 'Sign Up',
-        page_path: '/signup'
-      });
-    }
-  }, []);
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    console.log("Attempting signup with:", { email, username });
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -37,9 +29,11 @@ export default function SignUp() {
     });
 
     if (error) {
+      console.error("Signup error:", error);
       setError(error.message);
     } else {
-      alert("Account created successfully! Please check your email to confirm your account.");
+      console.log("Signup success:", data);
+      alert("Account created! Check your email for confirmation.");
       window.location.href = '/login';
     }
 
@@ -49,7 +43,6 @@ export default function SignUp() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10">
-        {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="OfferCrew" className="h-10" />
@@ -60,7 +53,7 @@ export default function SignUp() {
         <h2 className="text-3xl font-bold text-center mb-2">Join the Crew</h2>
         <p className="text-gray-500 text-center mb-8">Create your account to get started</p>
 
-        {error && <p className="text-red-600 text-center mb-4">{error}</p>}
+        {error && <p className="text-red-600 text-center mb-4 bg-red-50 p-3 rounded-xl">{error}</p>}
 
         <form onSubmit={handleSignUp} className="space-y-6">
           <div>
