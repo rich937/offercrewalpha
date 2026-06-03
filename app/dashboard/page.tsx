@@ -38,20 +38,39 @@ export default function Dashboard() {
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
-      // TODO: In production, send images to backend for OCR + Grok API call
-      // For now, simulate intelligent response
-      const responses = [
-        { type: 'spark', text: "OH MY CIRCUITS! Another 'pre-approved' offer? These banks really think we're dummies huh? 😂" },
-        { type: 'shade', text: "Fine print game is strong. 0% intro APR then it jumps to highway robbery rates." },
-        { type: 'clara', text: "An intro rate is a promotional low interest rate offered for a limited time, usually 12-18 months." },
-        { type: 'ledger', text: "Offer Score: 6.4/10\n• Intro APR: Strong\n• Long-term rate: Risky\n• Recommendation: Read terms carefully" }
-      ];
+      // Upload files to Supabase Storage
+      for (const file of selectedFiles) {
+        const fileName = `${user.id}/${Date.now()}-${file.name}`;
+        await supabase.storage.from('mail-pieces').upload(fileName, file);
+      }
 
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, ...responses]);
-      }, 1400);
+      // Call real analysis endpoint (OCR + Grok API)
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append('files', file));
+      formData.append('userId', user.id);
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.crewResponse) {
+        // Split Grok's response into individual bot lines for better chat feel
+        const lines = result.crewResponse.split('\n').filter(Boolean);
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          text: line.trim()
+        }));
+
+        setChatMessages(prev => [...prev, ...crewMessages]);
+      } else {
+        setChatMessages(prev => [...prev, { type: 'system', text: "The Crew analyzed it!" }]);
+      }
     } catch (err) {
       console.error(err);
+      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
     }
 
     setSelectedFiles([]);
