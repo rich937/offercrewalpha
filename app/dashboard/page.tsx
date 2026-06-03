@@ -31,21 +31,47 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-  const analyzeWithCrew = async () => {
+    const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
-    // Reliable fallback response using your Character Bible style
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, 
-        { type: 'spark', text: "OH MY CIRCUITS! Another offer?! These banks are getting desperate! 😂" },
-        { type: 'shade', text: "Let me guess... 0% intro APR then they slam you with 29.99%. Classic trap." },
-        { type: 'clara', text: "An intro rate is a promotional low interest rate for a limited time." },
-        { type: 'ledger', text: "Offer Score: 6.7/10\n• Intro APR: Strong\n• Long-term rate: Risky\n• Recommendation: Read the fine print" }
-      ]);
-    }, 1200);
+    try {
+      // Upload files to Supabase
+      for (const file of selectedFiles) {
+        const fileName = `${user.id}/${Date.now()}-${file.name}`;
+        await supabase.storage.from('mail-pieces').upload(fileName, file);
+      }
+
+      // Call real analysis endpoint
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append('files', file));
+      formData.append('userId', user.id);
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.crewResponse) {
+        // Split into individual bot responses for better flow
+        const lines = result.crewResponse.split('\n').filter(line => line.trim().length > 5);
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          text: line.trim()
+        }));
+
+        setChatMessages(prev => [...prev, ...crewMessages]);
+      } else {
+        setChatMessages(prev => [...prev, { type: 'system', text: "The Crew has spoken!" }]);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
+    }
 
     setSelectedFiles([]);
     setUploading(false);
