@@ -31,7 +31,7 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-    const analyzeWithCrew = async () => {
+     const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -44,7 +44,7 @@ export default function Dashboard() {
         await supabase.storage.from('mail-pieces').upload(fileName, file);
       }
 
-      // Call real analysis endpoint
+      // Call analysis endpoint
       const formData = new FormData();
       selectedFiles.forEach(file => formData.append('files', file));
       formData.append('userId', user.id);
@@ -57,10 +57,13 @@ export default function Dashboard() {
       const result = await response.json();
 
       if (result.crewResponse) {
-        // Split into individual bot responses for better flow
-        const lines = result.crewResponse.split('\n').filter(line => line.trim().length > 5);
+        // Fixed typing
+        const lines: string[] = typeof result.crewResponse === 'string' 
+          ? result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5)
+          : [];
+
         const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4] as string,
           text: line.trim()
         }));
 
