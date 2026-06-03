@@ -49,7 +49,51 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
-        {/* Main Upload Area */}
+        
+        {/* Left Side: Phone-shaped Chat Interface */}
+        <div className="w-96">
+          <div className="bg-black rounded-[3rem] p-3 shadow-2xl mx-auto" style={{ maxWidth: '380px' }}>
+            <div className="bg-white rounded-[2.5rem] h-[680px] flex flex-col overflow-hidden">
+              
+              {/* Chat Header with Crew Icons */}
+              <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-4 text-white">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">OfferCrew Chat</h3>
+                  <div className="flex gap-1">
+                    <div className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-xs">L</div>
+                    <div className="w-7 h-7 bg-orange-500 rounded-full flex items-center justify-center text-xs">S</div>
+                    <div className="w-7 h-7 bg-purple-500 rounded-full flex items-center justify-center text-xs">H</div>
+                    <div className="w-7 h-7 bg-red-500 rounded-full flex items-center justify-center text-xs">C</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chat Messages Area */}
+              <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4">
+                <div className="text-center text-gray-400 text-sm py-8">
+                  The Crew is waiting for your first mail piece...
+                </div>
+              </div>
+
+              {/* Text Input Area */}
+              <div className="border-t p-4 bg-white">
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Type a message or upload mail..." 
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500 text-sm"
+                  />
+                  <button className="bg-black text-white px-6 rounded-2xl font-medium">
+                    Send
+                  </button>
+                </div>
+                <p className="text-center text-[10px] text-gray-400 mt-3">Upload a photo of your mail to start the roast</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Upload Area */}
         <div className="flex-1">
           <h1 className="text-3xl font-bold mb-8">Upload Your Mail</h1>
           
@@ -63,19 +107,6 @@ export default function Dashboard() {
               Browse Files
             </button>
             <p className="text-xs text-gray-400 mt-6">Supports JPG, PNG, PDF • Max 10MB</p>
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="w-96 bg-white rounded-3xl p-6 h-fit">
-          <h2 className="font-semibold text-lg mb-6">Recent Uploads</h2>
-          
-          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-2xl p-12 text-center">
-            <div className="mx-auto w-12 h-12 bg-gray-200 rounded-2xl flex items-center justify-center mb-4 text-3xl">
-              📪
-            </div>
-            <p className="font-medium text-gray-600 mb-1">No uploads yet</p>
-            <p className="text-sm text-gray-500">Your uploaded mail pieces and Crew reactions will appear here.</p>
           </div>
         </div>
       </div>
