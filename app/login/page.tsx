@@ -1,37 +1,46 @@
 'use client';
 
-import { useEffect } from 'react';
-
-declare global {
-  interface Window {
-    gtag: (...args: any[]) => void;
-  }
-}
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';   // ← Fixed path
+import Link from 'next/link';
 
 export default function Login() {
-  // Track page view in Google Analytics
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Track page view
   useEffect(() => {
-    const trackPageView = () => {
-      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
-        window.gtag('event', 'page_view', {
-          page_title: 'Login',
-          page_location: window.location.href,
-          page_path: '/login'
-        });
-      }
-    };
-
-    trackPageView();
-
-    // Backup call in case gtag loads late
-    const timeout = setTimeout(trackPageView, 1500);
-    return () => clearTimeout(timeout);
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'page_view', {
+        page_title: 'Login',
+        page_path: '/login'
+      });
+    }
   }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+    } else {
+      window.location.href = '/dashboard';
+    }
+    setLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10">
-        {/* Logo */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="OfferCrew" className="h-10" />
@@ -42,13 +51,18 @@ export default function Login() {
         <h2 className="text-3xl font-bold text-center mb-2">Welcome back</h2>
         <p className="text-gray-500 text-center mb-8">Log in to see your Crew reactions</p>
 
-        <form className="space-y-6">
+        {error && <p className="text-red-600 text-center mb-4">{error}</p>}
+
+        <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
             <input 
-              type="text" 
-              placeholder="Enter your username" 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com" 
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
+              required
             />
           </div>
 
@@ -56,28 +70,28 @@ export default function Login() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
             <input 
               type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password" 
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
+              required
             />
-          </div>
-
-          <div className="flex justify-between text-sm">
-            <a href="#" className="text-cyan-600 hover:text-cyan-700">Forgot password?</a>
           </div>
 
           <button 
             type="submit"
-            className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition"
+            disabled={loading}
+            className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition disabled:opacity-50"
           >
-            Log In
+            {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
 
         <p className="text-center mt-8 text-gray-600">
           Don't have an account?{" "}
-          <a href="/signup" className="text-cyan-600 font-medium hover:text-cyan-700">
+          <Link href="/signup" className="text-cyan-600 font-medium hover:text-cyan-700">
             Sign up
-          </a>
+          </Link>
         </p>
       </div>
     </div>
