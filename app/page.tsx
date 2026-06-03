@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
@@ -15,8 +17,18 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="px-6 py-2 text-gray-700 hover:text-black font-medium">Log In</button>
-            <button className="px-6 py-2 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">Sign Up</button>
+            <Link 
+              href="/login"
+              className="px-6 py-2 text-gray-700 hover:text-black font-medium"
+            >
+              Log In
+            </Link>
+            <Link 
+              href="/signup"
+              className="px-6 py-2 bg-black text-white rounded-2xl font-medium hover:bg-gray-800"
+            >
+              Sign Up
+            </Link>
           </div>
         </div>
       </nav>
@@ -40,23 +52,20 @@ export default function Home() {
             Upload your financial mail. Watch the Crew react.
           </p>
 
-                    <div className="flex justify-center gap-4">
-            <button 
-              onClick={() => window.location.href = '/login'}
+          <div className="flex justify-center gap-4">
+            <Link 
+              href="/login"
               className="px-8 py-4 bg-white text-black rounded-2xl font-semibold hover:bg-gray-100 text-lg"
             >
               Log In
-            </button>
-            <button 
-              onClick={() => window.location.href = '/signup'}
+            </Link>
+            <Link 
+              href="/signup"
               className="px-8 py-4 bg-cyan-500 text-white rounded-2xl font-semibold hover:bg-cyan-600 text-lg"
             >
               Sign Up
-            </button>
-            <button 
-              onClick={() => window.location.href = '/demo'}
-              className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-2xl font-semibold hover:bg-white/20 text-lg"
-            >
+            </Link>
+            <button className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-2xl font-semibold hover:bg-white/20 text-lg">
               Free Demo
             </button>
           </div>
