@@ -16,24 +16,22 @@ export default function SignUp() {
     setLoading(true);
     setError(null);
 
-    console.log("Attempting signup with:", { email, username });
+    console.log("🔄 Attempting signup with:", { email, username });
 
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: {
-          username: username || email.split('@')[0],
-        }
+        data: { username: username || email.split('@')[0] }
       }
     });
 
     if (error) {
-      console.error("Signup error:", error);
+      console.error("❌ Signup error:", error);
       setError(error.message);
     } else {
-      console.log("Signup success:", data);
-      alert("Account created! Check your email for confirmation.");
+      console.log("✅ Signup success:", data);
+      alert("Success! Check your email for confirmation link.");
       window.location.href = '/login';
     }
 
@@ -53,58 +51,31 @@ export default function SignUp() {
         <h2 className="text-3xl font-bold text-center mb-2">Join the Crew</h2>
         <p className="text-gray-500 text-center mb-8">Create your account to get started</p>
 
-        {error && <p className="text-red-600 text-center mb-4 bg-red-50 p-3 rounded-xl">{error}</p>}
+        {error && <p className="text-red-600 text-center mb-4 bg-red-50 p-4 rounded-2xl">{error}</p>}
 
         <form onSubmit={handleSignUp} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-            <input 
-              type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Choose a username" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
-            />
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Choose a username" className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
-              required
-            />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500" required />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password (min 6 characters)" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
-              required
-            />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min 6 characters" className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500" required />
           </div>
 
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition disabled:opacity-50"
-          >
-            {loading ? 'Creating account...' : 'Create Account'}
+          <button type="submit" disabled={loading} className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 disabled:opacity-50">
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 
         <p className="text-center mt-8 text-gray-600">
-          Already have an account?{" "}
-          <Link href="/login" className="text-cyan-600 font-medium hover:text-cyan-700">
-            Log in
-          </Link>
+          Already have an account? <Link href="/login" className="text-cyan-600 font-medium">Log in</Link>
         </p>
       </div>
     </div>
