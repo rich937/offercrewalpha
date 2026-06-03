@@ -7,6 +7,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([
     { type: 'system', text: 'The Crew is ready. Upload a piece of mail to begin the roast!' }
   ]);
@@ -23,38 +24,50 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(files);
-      console.log(`📸 ${files.length} file(s) selected`);
+      setSelectedFiles(Array.from(e.target.files));
     }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files) {
-      const files = Array.from(e.dataTransfer.files);
-      setSelectedFiles(files);
+      setSelectedFiles(Array.from(e.dataTransfer.files));
     }
   };
 
-  // Trigger Crew Reaction
-  const triggerCrewReaction = () => {
+  const uploadFiles = async () => {
     if (selectedFiles.length === 0) return;
 
+    setUploading(true);
+
+    for (const file of selectedFiles) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}-${file.name}`;
+
+      const { error } = await supabase.storage
+        .from('mail-pieces')
+        .upload(fileName, file);
+
+      if (error) console.error("Upload error:", error);
+    }
+
+    // Trigger Crew Reaction using Character Interaction Protocol
     setChatMessages(prev => [...prev, { 
       type: 'system', 
       text: `Analyzing ${selectedFiles.length} mail piece(s)...` 
     }]);
 
-    // Simulate Crew Reaction using Character Interaction Protocol style
     setTimeout(() => {
       setChatMessages(prev => [...prev, 
         { type: 'spark', text: "OH SNAP! Another credit card offer? These banks really think we're dummies huh? 😂" },
-        { type: 'shade', text: "Fine print game is strong on this one. 19.99% APR after intro rate. Classic." },
-        { type: 'clara', text: "Just a reminder: An intro rate is a temporary low interest rate offered for the first 12-18 months." },
-        { type: 'ledger', text: "Offer Score: 6.4/10\n• Intro APR: Good\n• Annual Fee: $0\n• Balance Transfer: Not mentioned" }
+        { type: 'shade', text: "Fine print game is strong on this one. Classic trap." },
+        { type: 'clara', text: "This is an intro APR offer — a temporary low interest rate for the first 12-18 months." },
+        { type: 'ledger', text: "Offer Score: 6.8/10\n• Intro APR: Good\n• Annual Fee: $0\n• Recommendation: Review carefully" }
       ]);
-    }, 1200);
+    }, 1400);
+
+    setSelectedFiles([]);
+    setUploading(false);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -78,7 +91,7 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
-        {/* Phone Chat Interface */}
+        {/* Left: Phone Chat Interface */}
         <div className="w-96 flex-shrink-0">
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl mx-auto" style={{ maxWidth: '380px' }}>
             <div className="bg-white rounded-[2.5rem] h-[680px] flex flex-col overflow-hidden">
@@ -109,7 +122,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Upload Area */}
+        {/* Right: Upload Area */}
         <div className="flex-1">
           <h1 className="text-3xl font-bold mb-8">Upload Your Mail</h1>
           
@@ -140,13 +153,14 @@ export default function Dashboard() {
           </div>
 
           {selectedFiles.length > 0 && (
-            <div className="mt-6">
+            <div className="mt-6 text-center">
               <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
               <button 
-                onClick={triggerCrewReaction}
-                className="bg-gradient-to-r from-cyan-500 to-purple-600 text-white px-10 py-4 rounded-2xl font-semibold hover:brightness-110"
+                onClick={uploadFiles}
+                disabled={uploading}
+                className="bg-gradient-to-r from-cyan-500 to-purple-600 text-white px-10 py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
-                Analyze with the Crew →
+                {uploading ? 'Uploading & Analyzing...' : 'Analyze with the Crew →'}
               </button>
             </div>
           )}
