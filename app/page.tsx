@@ -12,8 +12,8 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-8 text-gray-700">
-            <a href="#" className="hover:text-black font-medium">Home</a>
-            <a href="#" className="hover:text-black font-medium">About</a>
+            <Link href="/" className="hover:text-black font-medium">Home</Link>
+            <Link href="/about" className="hover:text-black font-medium">About</Link>
           </div>
 
           <div className="flex items-center gap-4">
