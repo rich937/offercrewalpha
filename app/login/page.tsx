@@ -1,4 +1,33 @@
+'use client';
+
+import { useEffect } from 'react';
+
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void;
+  }
+}
+
 export default function Login() {
+  // Track page view in Google Analytics
+  useEffect(() => {
+    const trackPageView = () => {
+      if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+        window.gtag('event', 'page_view', {
+          page_title: 'Login',
+          page_location: window.location.href,
+          page_path: '/login'
+        });
+      }
+    };
+
+    trackPageView();
+
+    // Backup call in case gtag loads late
+    const timeout = setTimeout(trackPageView, 1500);
+    return () => clearTimeout(timeout);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10">
