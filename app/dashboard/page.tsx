@@ -9,7 +9,7 @@ export default function Dashboard() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([
-    { type: 'system', text: 'The Crew is ready. Upload a piece of mail to begin the roast!' }
+    { type: 'system', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
 
   useEffect(() => {
@@ -23,48 +23,36 @@ export default function Dashboard() {
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSelectedFiles(Array.from(e.target.files));
-    }
+    if (e.target.files) setSelectedFiles(Array.from(e.target.files));
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files) {
-      setSelectedFiles(Array.from(e.dataTransfer.files));
-    }
+    if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-  const uploadFiles = async () => {
+  const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
+    setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
-    for (const file of selectedFiles) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}-${file.name}`;
+    try {
+      // TODO: In production, send images to backend for OCR + Grok API call
+      // For now, simulate intelligent response
+      const responses = [
+        { type: 'spark', text: "OH MY CIRCUITS! Another 'pre-approved' offer? These banks really think we're dummies huh? 😂" },
+        { type: 'shade', text: "Fine print game is strong. 0% intro APR then it jumps to highway robbery rates." },
+        { type: 'clara', text: "An intro rate is a promotional low interest rate offered for a limited time, usually 12-18 months." },
+        { type: 'ledger', text: "Offer Score: 6.4/10\n• Intro APR: Strong\n• Long-term rate: Risky\n• Recommendation: Read terms carefully" }
+      ];
 
-      const { error } = await supabase.storage
-        .from('mail-pieces')
-        .upload(fileName, file);
-
-      if (error) console.error("Upload error:", error);
+      setTimeout(() => {
+        setChatMessages(prev => [...prev, ...responses]);
+      }, 1400);
+    } catch (err) {
+      console.error(err);
     }
-
-    // Trigger Crew Reaction using Character Interaction Protocol
-    setChatMessages(prev => [...prev, { 
-      type: 'system', 
-      text: `Analyzing ${selectedFiles.length} mail piece(s)...` 
-    }]);
-
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, 
-        { type: 'spark', text: "OH SNAP! Another credit card offer? These banks really think we're dummies huh? 😂" },
-        { type: 'shade', text: "Fine print game is strong on this one. Classic trap." },
-        { type: 'clara', text: "This is an intro APR offer — a temporary low interest rate for the first 12-18 months." },
-        { type: 'ledger', text: "Offer Score: 6.8/10\n• Intro APR: Good\n• Annual Fee: $0\n• Recommendation: Review carefully" }
-      ]);
-    }, 1400);
 
     setSelectedFiles([]);
     setUploading(false);
@@ -74,7 +62,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Nav */}
       <nav className="bg-white border-b">
         <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -91,7 +78,7 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
-        {/* Left: Phone Chat Interface */}
+        {/* Phone Chat Interface */}
         <div className="w-96 flex-shrink-0">
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl mx-auto" style={{ maxWidth: '380px' }}>
             <div className="bg-white rounded-[2.5rem] h-[680px] flex flex-col overflow-hidden">
@@ -116,13 +103,13 @@ export default function Dashboard() {
               </div>
 
               <div className="border-t p-4 bg-white">
-                <input type="text" placeholder="Type a message..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
+                <input type="text" placeholder="Type a message to the Crew..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Upload Area */}
+        {/* Upload Area */}
         <div className="flex-1">
           <h1 className="text-3xl font-bold mb-8">Upload Your Mail</h1>
           
@@ -136,7 +123,7 @@ export default function Dashboard() {
               📄
             </div>
             <p className="text-xl font-medium text-gray-700 mb-2">Drop your mail pieces here</p>
-            <p className="text-gray-500 mb-6">or click to browse</p>
+            <p className="text-gray-500 mb-6">Multiple files supported</p>
             
             <input 
               id="fileInput"
@@ -156,11 +143,11 @@ export default function Dashboard() {
             <div className="mt-6 text-center">
               <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
               <button 
-                onClick={uploadFiles}
+                onClick={analyzeWithCrew}
                 disabled={uploading}
                 className="bg-gradient-to-r from-cyan-500 to-purple-600 text-white px-10 py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
-                {uploading ? 'Uploading & Analyzing...' : 'Analyze with the Crew →'}
+                {uploading ? 'Analyzing with the Crew...' : 'Analyze with the Crew →'}
               </button>
             </div>
           )}
