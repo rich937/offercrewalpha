@@ -4,7 +4,6 @@ export default function Home() {
       {/* Navigation */}
       <nav className="border-b">
         <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-          {/* Logo + Alpha Site */}
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="OfferCrew" className="h-10" />
             <span className="text-red-600 font-semibold text-xl tracking-wide">Alpha Site</span>
@@ -32,13 +31,13 @@ export default function Home() {
         <div className="absolute inset-0 bg-black/40"></div>
         
         <div className="relative z-10 max-w-5xl mx-auto px-6">
-          <h1 className="text-5xl font-bold text-white leading-tight mb-6">
-            Turn Boring Credit Card and Loan Mail Into<br />
-            <span className="text-cyan-400">Hilarious (and Educational) Robot Commentary</span>
+          <h1 className="text-6xl font-bold text-white leading-tight mb-6">
+            Turn Boring Junk Mail Into<br />
+            <span className="text-cyan-400">Hilarious Robot Roasts</span>
           </h1>
           
           <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
-            Upload your credit card, loan, financial mail. Watch the Crew react.
+            Upload your financial mail. Watch the Crew react.
           </p>
 
           <div className="flex justify-center gap-4">
