@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';   // ← Fixed path
+import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 
 export default function Login() {
@@ -10,14 +10,20 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track page view
+  // Track page view in Google Analytics
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', 'page_view', {
-        page_title: 'Login',
-        page_path: '/login'
-      });
-    }
+    const trackPageView = () => {
+      if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
+        (window as any).gtag('event', 'page_view', {
+          page_title: 'Login',
+          page_path: '/login'
+        });
+      }
+    };
+
+    trackPageView();
+    const timeout = setTimeout(trackPageView, 1000);
+    return () => clearTimeout(timeout);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
