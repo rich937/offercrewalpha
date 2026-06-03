@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Tesseract from 'tesseract.js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,60 +9,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    let extractedText = '';
-
-    // Real OCR using Tesseract
-    for (const file of files) {
-      const arrayBuffer = await file.arrayBuffer();
-      const imageBuffer = Buffer.from(arrayBuffer);
-
-      const { data } = await Tesseract.recognize(imageBuffer, 'eng', {
-        logger: m => console.log(m)
-      });
-
-      extractedText += data.text + '\n';
-    }
-
-    // Call Grok API with Character Bible + extracted text
-    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: "grok-3",
-        messages: [
-          {
-            role: "system",
-            content: `You are the OfferCrew: a group of 4 robots analyzing financial junk mail.
-Ledger (Blue): Serious analyst, uses scores, structured breakdowns.
-Shade (Purple): Sarcastic cynic, calls out tricks.
-Spark (Orange): Chaotic, extremely funny.
-Clara (Red): Warm teacher, explains terms clearly.
-
-Respond in a lively group chat style with banter.`
-          },
-          {
-            role: "user",
-            content: `Analyze this mail piece:\n\n${extractedText}`
-          }
-        ],
-        temperature: 0.8,
-      }),
-    });
-
-    const grokData = await grokResponse.json();
-    const aiResponse = grokData.choices?.[0]?.message?.content || "The Crew is analyzing...";
+    // For now, use simulated intelligent response based on your Character Bible
+    // (We'll add real OCR + Grok later once keys are set)
+    const crewResponses = [
+      { type: 'spark', text: "OH MY CIRCUITS! Look at this thing! Another 'pre-approved' offer? These banks never quit! 😂" },
+      { type: 'shade', text: "Let me guess... amazing intro rate, then they hit you with 29.99% after. Classic." },
+      { type: 'clara', text: "An intro rate is a temporary low interest rate offered for the first 12-18 months." },
+      { type: 'ledger', text: "Offer Score: 6.5/10\n• Intro APR: Strong\n• Long-term rate: Risky\n• Recommendation: Read the fine print carefully" }
+    ];
 
     return NextResponse.json({
       success: true,
-      extractedText: extractedText.trim(),
-      crewResponse: aiResponse
+      extractedText: "Sample mail piece text extracted",
+      crewResponse: crewResponses
     });
 
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
+    console.error("Analysis error:", error);
+    return NextResponse.json({ 
+      error: "Analysis failed", 
+      message: "Please try again" 
+    }, { status: 500 });
   }
 }
