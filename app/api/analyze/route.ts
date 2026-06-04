@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Tesseract from 'tesseract.js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,11 +14,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Simple test response for now (to confirm API is reachable)
+    let extractedText = '';
+
+    // === REAL OCR ===
+    for (const file of files) {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      console.log(`Running OCR on ${file.name}...`);
+
+      const { data } = await Tesseract.recognize(buffer, 'eng', {
+        logger: m => console.log(m)
+      });
+
+      extractedText += data.text + '\n\n';
+    }
+
+    console.log("Extracted text length:", extractedText.length);
+
+    // === REAL GROK CALL with Character Bible ===
+    const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: "grok-3",
+        messages: [
+          {
+            role: "system",
+            content: `You are OfferCrew — four fun robots reacting to financial junk mail in a lively group chat.
+
+- Spark (Orange): High-energy, chaotic, extremely funny
+- Shade (Purple): Sarcastic cynic, calls out tricks
+- Clara (Red): Warm, patient teacher who explains terms
+- Ledger (Blue): Serious analyst who gives Offer Score /10 and summary
+
+Use natural back-and-forth banter. Keep it entertaining.`
+          },
+          {
+            role: "user",
+            content: `Analyze this financial mail piece. Here is the extracted text:\n\n${extractedText}`
+          }
+        ],
+        temperature: 0.85,
+      }),
+    });
+
+    const grokData = await grokResponse.json();
+    const aiText = grokData.choices?.[0]?.message?.content || "The Crew is analyzing it...";
+
     return NextResponse.json({
       success: true,
-      extractedText: "Test OCR would go here",
-      crewResponse: `Spark: OH MY CIRCUITS! This looks like a juicy offer! 🔥\n\nShade: Of course they buried the real rate in the fine print.\n\nClara: This is what's called an introductory APR.\n\nLedger: Offer Score: 7.2/10\n• Good intro rate\n• Watch the balance transfer fees`
+      extractedText: extractedText.trim().substring(0, 800),
+      crewResponse: aiText
     });
 
   } catch (error) {
