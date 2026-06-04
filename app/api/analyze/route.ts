@@ -8,21 +8,17 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
-    console.log(`Received ${files.length} files`);
-
     if (files.length === 0) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Convert first image to base64 for Grok Vision
+    // Process first file for now
     const file = files[0];
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
 
-    console.log(`Image converted successfully`);
-
-    // Grok Vision Call with Reference Guide
+    // Grok Vision Analysis
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -34,47 +30,54 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew — exactly four robots having a lively group chat about financial junk mail.
+            content: `You are OfferCrew. Analyze the image and return a structured summary.
 
 ${REFERENCE_GUIDE}
 
-Remember: 
-- Generate TWICE as much banter with natural back-and-forth.
-- Ledger must ALWAYS be the final speaker with a structured recap and Offer Score.`
+Return your response as a natural group chat, but also include clear extraction at the top in this format:
+
+LENDER: [Company Name]
+PRODUCT_TYPE: [Credit Card / Home Equity / Personal Loan / etc.]
+IS_PREAPPROVED: [true/false]
+LEDGER_SCORE: [X.X]
+
+Then continue with the full crew banter.`
           },
           {
             role: "user",
             content: [
-              {
-                type: "image_url",
-                image_url: { url: `data:${mimeType};base64,${base64}` }
-              },
-              { 
-                type: "text", 
-                text: "Analyze this financial mail piece thoroughly as the full OfferCrew." 
-              }
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+              { type: "text", text: "Extract key metadata and then react as the full Crew." }
             ]
           }
         ],
-        temperature: 0.8,
-        max_tokens: 1000,
+        temperature: 0.7,
+        max_tokens: 1100,
       }),
     });
 
-    if (!grokResponse.ok) {
-      const errorText = await grokResponse.text();
-      console.error("Grok API Error:", grokResponse.status, errorText);
-      throw new Error(`Grok API error: ${grokResponse.status}`);
-    }
-
     const grokData = await grokResponse.json();
-    const aiText = grokData.choices?.[0]?.message?.content || "The Crew analyzed it!";
+    const aiText = grokData.choices?.[0]?.message?.content || "Analysis failed";
 
-    console.log("✅ Analysis completed");
+    // Simple parsing for metadata
+    const lenderMatch = aiText.match(/LENDER:\s*(.+)/i);
+    const productMatch = aiText.match(/PRODUCT_TYPE:\s*(.+)/i);
+    const preapprovedMatch = aiText.match(/IS_PREAPPROVED:\s*(true|false)/i);
+    const scoreMatch = aiText.match(/LEDGER_SCORE:\s*(\d+\.?\d*)/i);
+
+    const metadata = {
+      lender: lenderMatch ? lenderMatch[1].trim() : null,
+      product_type: productMatch ? productMatch[1].trim() : null,
+      is_preapproved: preapprovedMatch ? preapprovedMatch[1].toLowerCase() === 'true' : false,
+      ledger_score: scoreMatch ? parseFloat(scoreMatch[1]) : null,
+    };
+
+    console.log("Extracted Metadata:", metadata);
 
     return NextResponse.json({
       success: true,
-      crewResponse: aiText
+      crewResponse: aiText,
+      metadata: metadata
     });
 
   } catch (error) {
