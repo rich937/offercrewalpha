@@ -31,22 +31,53 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-  const analyzeWithCrew = async () => {
+   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
-    // Very light version to stop hanging
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, 
-        { type: 'spark', text: "OH MY CIRCUITS! This looks juicy! 😂" },
-        { type: 'shade', text: "Fine print is sneaky as usual." },
-        { type: 'clara', text: "This is an intro APR offer." },
-        { type: 'ledger', text: "Offer Score: 6.8/10" }
-      ]);
-      setUploading(false);
-    }, 800);
+    try {
+      // Upload files to Supabase
+      for (const file of selectedFiles) {
+        const fileName = `${user.id}/${Date.now()}-${file.name}`;
+        await supabase.storage.from('mail-pieces').upload(fileName, file);
+      }
+
+      // Call the REAL analysis endpoint
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append('files', file));
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+
+      const result = await response.json();
+
+      if (result.crewResponse) {
+        // Split the Grok response into individual bot lines
+        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5);
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          text: line.trim()
+        }));
+
+        setChatMessages(prev => [...prev, ...crewMessages]);
+      } else {
+        setChatMessages(prev => [...prev, { type: 'system', text: "The Crew has spoken!" }]);
+      }
+    } catch (err) {
+      console.error("Analysis error:", err);
+      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
+    }
+
+    setSelectedFiles([]);
+    setUploading(false);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
