@@ -53,36 +53,41 @@ export default function Dashboard() {
     }
   };
 
-  const analyzeWithCrew = async () => {
+    const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
-
-    console.log("🚀 Starting analysis for", selectedFiles.length, "files");
 
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
+      console.log("🚀 Starting upload and insert for", selectedFiles.length, "files");
+
       for (const file of selectedFiles) {
         const timestamp = Date.now();
         const filePath = `${user.id}/${timestamp}-${file.name}`;
-        console.log("📤 Uploading:", filePath);
+        
+        console.log("📤 Uploading file:", filePath);
 
         const { error: uploadError } = await supabase.storage.from('mail-pieces').upload(filePath, file);
-        if (uploadError) console.error("Upload failed:", uploadError);
+        if (uploadError) console.error("Upload error:", uploadError);
 
         console.log("💾 Inserting into offers table...");
-        const { data: inserted, error: insertError } = await supabase.from('offers').insert({
-          user_id: user.id,
-          file_path: filePath,
-          file_name: file.name,
-          lender: 'Pending',
-          sequence_number: timestamp
-        }).select().single();
+        const { data: inserted, error: insertError } = await supabase
+          .from('offers')
+          .insert({
+            user_id: user.id,
+            file_path: filePath,
+            file_name: file.name,
+            lender: file.name.split('-')[0] || 'Unknown',
+            sequence_number: timestamp
+          })
+          .select()
+          .single();
 
         if (insertError) {
-          console.error("❌ Insert error:", insertError);
+          console.error("❌ INSERT FAILED:", insertError);
         } else {
-          console.log("✅ Successfully inserted record:", inserted?.id);
+          console.log("✅ Successfully inserted:", inserted?.id);
         }
       }
 
@@ -109,7 +114,6 @@ export default function Dashboard() {
         setChatMessages(crewMessages);
       }
 
-      console.log("🔄 Refreshing history...");
       await loadHistory(user.id);
 
     } catch (err) {
