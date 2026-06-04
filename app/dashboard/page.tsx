@@ -58,15 +58,14 @@ export default function Dashboard() {
       const result = await response.json();
 
       if (result.crewResponse) {
-        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5);
+        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
         
-        const crewMessages = lines.map((line: string, i: number) => {
-          const types = ['spark', 'shade', 'clara', 'ledger'];
-          return {
-            type: types[i % 4],
-            text: line.trim()
-          };
-        });
+        const speakerOrder = ['spark', 'shade', 'clara', 'ledger'];
+        
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: speakerOrder[i % 4],
+          text: line.trim()
+        }));
 
         setChatMessages(prev => [...prev, ...crewMessages]);
       }
@@ -80,19 +79,19 @@ export default function Dashboard() {
   };
 
   const getIconPath = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'ledger': return '/icons/Ledger Icon.png';
-      case 'spark': return '/icons/Spark Icon.png';
-      case 'shade': return '/icons/Shade Icon.png';
-      case 'clara': return '/icons/Clara Icon.png';
-      default: return '/icons/Ledger Icon.png';
-    }
+    const t = type.toLowerCase();
+    if (t.includes('ledger') || t === 'l') return '/icons/Ledger Icon.png';
+    if (t.includes('spark') || t === 's') return '/icons/Spark Icon.png';
+    if (t.includes('shade') || t === 'h') return '/icons/Shade Icon.png';
+    if (t.includes('clara') || t === 'c') return '/icons/Clara Icon.png';
+    return '/icons/Ledger Icon.png'; // fallback
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Nav remains the same */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -110,41 +109,29 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
         
-        {/* LEFT: Upload Interface */}
+        {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
-          <div 
-            className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => document.getElementById('fileInput')?.click()}
-          >
+          <div className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
+            onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => document.getElementById('fileInput')?.click()}>
             <div className="text-6xl mb-6">📄</div>
             <p className="text-lg font-medium text-gray-700 mb-2">Drop mail here</p>
             <p className="text-gray-500 mb-8">or click to browse</p>
-            
             <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-            
-            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">
-              Browse Files
-            </button>
+            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">Browse Files</button>
           </div>
 
           {selectedFiles.length > 0 && (
             <div className="mt-6 text-center">
               <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
-              <button 
-                onClick={analyzeWithCrew}
-                disabled={uploading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
-              >
+              <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
                 {uploading ? 'Analyzing...' : 'Send to the Crew →'}
               </button>
             </div>
           )}
         </div>
 
-        {/* CENTER: Crew Chat */}
+        {/* CENTER: Chat */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Reactions</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
@@ -160,7 +147,7 @@ export default function Dashboard() {
                       <img 
                         src={getIconPath(msg.type)} 
                         alt={msg.type}
-                        className="w-10 h-10 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
+                        className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
                       />
                     )}
                     <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
