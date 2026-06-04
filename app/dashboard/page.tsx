@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [chatMessages, setChatMessages] = useState<any[]>([
     { type: 'system', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -20,7 +21,17 @@ export default function Dashboard() {
       if (!user) window.location.href = '/login';
     };
     getUser();
+    loadHistory();
   }, []);
+
+  const loadHistory = async () => {
+    // TODO: Later we'll pull real history from Supabase
+    setHistory([
+      { id: 1, lender: "Figure", sequence: "034982", score: "7.8", date: "2 days ago" },
+      { id: 2, lender: "Capital One", sequence: "119284", score: "5.4", date: "1 week ago" },
+      { id: 3, lender: "Discover", sequence: "887421", score: "8.1", date: "2 weeks ago" },
+    ]);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) setSelectedFiles(Array.from(e.target.files));
@@ -31,20 +42,13 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-   const analyzeWithCrew = async () => {
+  const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
-      // Upload files to Supabase
-      for (const file of selectedFiles) {
-        const fileName = `${user.id}/${Date.now()}-${file.name}`;
-        await supabase.storage.from('mail-pieces').upload(fileName, file);
-      }
-
-      // Call the REAL analysis endpoint
       const formData = new FormData();
       selectedFiles.forEach(file => formData.append('files', file));
 
@@ -53,14 +57,9 @@ export default function Dashboard() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
       const result = await response.json();
 
       if (result.crewResponse) {
-        // Split the Grok response into individual bot lines
         const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5);
         const crewMessages = lines.map((line: string, i: number) => ({
           type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
@@ -68,11 +67,9 @@ export default function Dashboard() {
         }));
 
         setChatMessages(prev => [...prev, ...crewMessages]);
-      } else {
-        setChatMessages(prev => [...prev, { type: 'system', text: "The Crew has spoken!" }]);
       }
     } catch (err) {
-      console.error("Analysis error:", err);
+      console.error(err);
       setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
     }
 
@@ -85,7 +82,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="OfferCrew" className="h-10" />
             <span className="text-red-600 font-semibold text-xl">Alpha Site</span>
@@ -99,63 +96,23 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-6 py-10 flex gap-8">
-        {/* Phone Chat */}
-        <div className="w-96 flex-shrink-0">
-          <div className="bg-black rounded-[3rem] p-3 shadow-2xl mx-auto" style={{ maxWidth: '380px' }}>
-            <div className="bg-white rounded-[2.5rem] h-[680px] flex flex-col overflow-hidden">
-              <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-4 text-white">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold">OfferCrew</h3>
-                  <div className="flex gap-2">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">L</div>
-                    <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">S</div>
-                    <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">H</div>
-                    <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">C</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4 text-sm">
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`p-3 rounded-2xl ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-cyan-50'}`}>
-                    {msg.text}
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t p-4 bg-white">
-                <input type="text" placeholder="Type a message to the Crew..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Upload Area */}
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold mb-8">Upload Your Mail</h1>
-          
+      <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
+        
+        {/* LEFT: Upload Interface */}
+        <div className="w-80 flex-shrink-0">
+          <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
           <div 
-            className="border-2 border-dashed border-gray-300 rounded-3xl h-96 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
+            className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => document.getElementById('fileInput')?.click()}
           >
-            <div className="w-16 h-16 bg-cyan-100 rounded-2xl flex items-center justify-center mb-6 text-4xl">
-              📄
-            </div>
-            <p className="text-xl font-medium text-gray-700 mb-2">Drop your mail pieces here</p>
-            <p className="text-gray-500 mb-6">Multiple files supported</p>
+            <div className="text-6xl mb-6">📄</div>
+            <p className="text-lg font-medium text-gray-700 mb-2">Drop mail here</p>
+            <p className="text-gray-500 mb-8">or click to browse</p>
             
-            <input 
-              id="fileInput"
-              type="file" 
-              accept="image/*,.pdf" 
-              multiple
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-
+            <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+            
             <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">
               Browse Files
             </button>
@@ -167,12 +124,62 @@ export default function Dashboard() {
               <button 
                 onClick={analyzeWithCrew}
                 disabled={uploading}
-                className="bg-gradient-to-r from-cyan-500 to-purple-600 text-white px-10 py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
+                className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
-                {uploading ? 'Analyzing with the Crew...' : 'Analyze with the Crew →'}
+                {uploading ? 'Analyzing...' : 'Send to the Crew →'}
               </button>
             </div>
           )}
+        </div>
+
+        {/* CENTER: Crew Chat */}
+        <div className="flex-1 flex flex-col">
+          <h2 className="text-xl font-semibold mb-4">Crew Reactions</h2>
+          <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '480px', margin: '0 auto' }}>
+            <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
+              <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-5 text-white">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold text-lg">OfferCrew</h3>
+                  <div className="flex gap-3">
+                    <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white">L</div>
+                    <div className="w-9 h-9 bg-orange-500 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white">S</div>
+                    <div className="w-9 h-9 bg-purple-500 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white">H</div>
+                    <div className="w-9 h-9 bg-red-500 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white">C</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-4">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`p-4 rounded-2xl ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Previous Offers Catalog */}
+        <div className="w-80 flex-shrink-0">
+          <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
+          <div className="space-y-4">
+            {history.map((item) => (
+              <div key={item.id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-300 cursor-pointer transition-colors">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold text-lg">{item.lender}</p>
+                    <p className="text-sm text-gray-500">#{item.sequence}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-cyan-600">{item.score}</div>
+                    <div className="text-xs text-gray-500">Ledger Score</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-3">{item.date}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
