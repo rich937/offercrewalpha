@@ -31,20 +31,20 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-     const analyzeWithCrew = async () => {
+  const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
-      // Upload files to Supabase
+      // Upload files
       for (const file of selectedFiles) {
         const fileName = `${user.id}/${Date.now()}-${file.name}`;
         await supabase.storage.from('mail-pieces').upload(fileName, file);
       }
 
-      // Call analysis endpoint
+      // Call real analysis endpoint
       const formData = new FormData();
       selectedFiles.forEach(file => formData.append('files', file));
       formData.append('userId', user.id);
@@ -57,13 +57,10 @@ export default function Dashboard() {
       const result = await response.json();
 
       if (result.crewResponse) {
-        // Fixed typing
-        const lines: string[] = typeof result.crewResponse === 'string' 
-          ? result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5)
-          : [];
-
+        // Split Grok response into individual bot lines
+        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5);
         const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4] as string,
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
           text: line.trim()
         }));
 
@@ -125,7 +122,7 @@ export default function Dashboard() {
               </div>
 
               <div className="border-t p-4 bg-white">
-                <input type="text" placeholder="Type a message..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
+                <input type="text" placeholder="Type a message to the Crew..." className="w-full px-4 py-3 border border-gray-300 rounded-2xl text-sm" />
               </div>
             </div>
           </div>
@@ -169,7 +166,7 @@ export default function Dashboard() {
                 disabled={uploading}
                 className="bg-gradient-to-r from-cyan-500 to-purple-600 text-white px-10 py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
-                {uploading ? 'Analyzing...' : 'Analyze with the Crew →'}
+                {uploading ? 'Analyzing with the Crew...' : 'Analyze with the Crew →'}
               </button>
             </div>
           )}
