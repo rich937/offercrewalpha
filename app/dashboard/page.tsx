@@ -33,12 +33,18 @@ export default function Dashboard() {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setSelectedFiles(Array.from(e.target.files));
+    if (e.target.files) {
+      const files = Array.from(e.target.files).slice(0, 4); // Limit to 4 images
+      setSelectedFiles(files);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
+    if (e.dataTransfer.files) {
+      const files = Array.from(e.dataTransfer.files).slice(0, 4);
+      setSelectedFiles(files);
+    }
   };
 
   const analyzeWithCrew = async () => {
@@ -155,7 +161,18 @@ export default function Dashboard() {
         
         {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
-          <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
+          <h2 className="text-xl font-semibold mb-4">Upload Mail</h2>
+          
+          <div className="mb-6 text-sm text-gray-600">
+            <p className="font-medium mb-2">Best results with up to 4 photos:</p>
+            <ul className="list-disc pl-5 space-y-1 text-xs">
+              <li>Front of the envelope</li>
+              <li>Front of the main letter/offer</li>
+              <li>Back of the letter (if text)</li>
+              <li>Schumer Box (if present)</li>
+            </ul>
+          </div>
+
           <div 
             className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
             onDrop={handleDrop}
@@ -163,33 +180,28 @@ export default function Dashboard() {
             onClick={() => document.getElementById('fileInput')?.click()}
           >
             <div className="text-6xl mb-6">📄</div>
-            <p className="text-lg font-medium text-gray-700 mb-2">Drop mail here</p>
-            <p className="text-gray-500 mb-8">or click to browse</p>
+            <p className="text-lg font-medium text-gray-700 mb-1">Drop mail photos here</p>
+            <p className="text-gray-500 mb-6">Max 4 images</p>
             
-            <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+            <input 
+              id="fileInput" 
+              type="file" 
+              accept="image/*" 
+              multiple 
+              className="hidden" 
+              onChange={handleFileSelect} 
+            />
             
-            <button 
-              onClick={() => {
-                if (typeof window !== 'undefined' && (window as any).gtag) {
-                  (window as any).gtag('event', 'upload_mail', {
-                    event_category: 'Engagement',
-                    event_label: 'Send to Crew Button',
-                    value: selectedFiles.length,
-                    files_count: selectedFiles.length
-                  });
-                }
-                analyzeWithCrew();
-              }}
-              disabled={uploading}
-              className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
-            >
+            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">
               Browse Files
             </button>
           </div>
 
           {selectedFiles.length > 0 && (
             <div className="mt-6 text-center">
-              <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
+              <p className="font-medium mb-3">
+                {selectedFiles.length} / 4 file(s) selected
+              </p>
               <button 
                 onClick={analyzeWithCrew}
                 disabled={uploading}
