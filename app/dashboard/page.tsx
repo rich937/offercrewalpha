@@ -44,6 +44,16 @@ export default function Dashboard() {
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
+    // Google Analytics Tracking
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'upload_mail', {
+        event_category: 'Engagement',
+        event_label: 'Send to Crew Button',
+        value: selectedFiles.length,
+        files_count: selectedFiles.length
+      });
+    }
+
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
@@ -158,7 +168,21 @@ export default function Dashboard() {
             
             <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
             
-            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">
+            <button 
+              onClick={() => {
+                if (typeof window !== 'undefined' && (window as any).gtag) {
+                  (window as any).gtag('event', 'upload_mail', {
+                    event_category: 'Engagement',
+                    event_label: 'Send to Crew Button',
+                    value: selectedFiles.length,
+                    files_count: selectedFiles.length
+                  });
+                }
+                analyzeWithCrew();
+              }}
+              disabled={uploading}
+              className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
+            >
               Browse Files
             </button>
           </div>
