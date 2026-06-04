@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 
@@ -10,131 +10,120 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Track page view
-  useEffect(() => {
-    if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
-      (window as any).gtag('event', 'page_view', {
-        page_title: 'Sign Up',
-        page_path: '/signup'
-      });
-    }
-  }, []);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-
+    
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      setLoading(false);
+      setError("Passwords don't match");
       return;
     }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters");
-      setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username: username || email.split('@')[0],
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { username: username }
         }
-      }
-    });
+      });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      alert("Account created successfully! Please check your email to confirm your account.");
-      window.location.href = '/login';
+      if (signUpError) throw signUpError;
+
+      setSuccess("Account created successfully! Redirecting to dashboard...");
+
+      // Auto redirect to dashboard
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1500);
+
+    } catch (err: any) {
+      setError(err.message || "Failed to create account");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10">
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="OfferCrew" className="h-10" />
-            <span className="text-red-600 font-semibold text-xl">Alpha Site</span>
-          </div>
+        <div className="text-center mb-8">
+          <img src="/logo.png" alt="OfferCrew" className="h-12 mx-auto mb-6" />
+          <h1 className="text-3xl font-bold">Create your account</h1>
+          <p className="text-gray-600 mt-2">Join the Crew</p>
         </div>
-
-        <h2 className="text-3xl font-bold text-center mb-2">Join the Crew</h2>
-        <p className="text-gray-500 text-center mb-8">Create your account to get started</p>
-
-        {error && <p className="text-red-600 text-center mb-4 bg-red-50 p-4 rounded-2xl">{error}</p>}
 
         <form onSubmit={handleSignUp} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-            <input 
-              type="text" 
+            <label className="block text-sm font-medium mb-2">Username (Screen Name)</label>
+            <input
+              type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Choose a username" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <input 
-              type="email" 
+            <label className="block text-sm font-medium mb-2">Email Address</label>
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-            <input 
-              type="password" 
+            <label className="block text-sm font-medium mb-2">Password</label>
+            <input
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
-            <input 
-              type="password" 
+            <label className="block text-sm font-medium mb-2">Confirm Password</label>
+            <input
+              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your password" 
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-cyan-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
               required
             />
           </div>
 
-          <button 
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {success && <p className="text-green-600 text-sm">{success}</p>}
+
+          <button
             type="submit"
             disabled={loading}
-            className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition disabled:opacity-50"
+            className="w-full bg-black text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 disabled:opacity-50"
           >
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 
-        <p className="text-center mt-8 text-gray-600">
-          Already have an account?{" "}
-          <Link href="/login" className="text-cyan-600 font-medium hover:text-cyan-700">
+        <p className="text-center mt-6 text-gray-600">
+          Already have an account?{' '}
+          <Link href="/login" className="text-cyan-600 hover:underline font-medium">
             Log in
           </Link>
         </p>
