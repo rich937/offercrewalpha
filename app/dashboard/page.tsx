@@ -14,14 +14,13 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    const getUser = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       setLoading(false);
-      if (!user) window.location.href = '/login';
-      else loadHistory(user.id);
+      if (user) loadHistory(user.id);
     };
-    getUser();
+    init();
   }, []);
 
   const loadHistory = async (userId: string) => {
@@ -30,7 +29,6 @@ export default function Dashboard() {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-
     setHistory(data || []);
   };
 
@@ -50,37 +48,27 @@ export default function Dashboard() {
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
-      const newEntries = [];
-
       for (const file of selectedFiles) {
         const filePath = `${user.id}/${Date.now()}-${file.name}`;
         await supabase.storage.from('mail-pieces').upload(filePath, file);
 
-        // Save to offers table
-        const { data: offer } = await supabase
-          .from('offers')
-          .insert({
-            user_id: user.id,
-            file_path: filePath,
-            file_name: file.name,
-            lender: file.name.split('-')[0] || 'Unknown',
-            sequence_number: Math.floor(Math.random() * 999999) + 1 // temporary - we'll improve this
-          })
-          .select()
-          .single();
-
-        if (offer) newEntries.push(offer);
+        await supabase.from('offers').insert({
+          user_id: user.id,
+          file_path: filePath,
+          file_name: file.name,
+          lender: 'Pending',
+          sequence_number: Date.now()
+        });
       }
 
-      // Analyze
       const formData = new FormData();
-      selectedFiles.forEach(file => formData.append('files', file));
+      selectedFiles.forEach(f => formData.append('files', f));
 
-      const response = await fetch('/api/analyze', { method: 'POST', body: formData });
-      const result = await response.json();
+      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+      const result = await res.json();
 
       if (result.crewResponse) {
-        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
+        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
         const crewMessages = lines.map((line: string, i: number) => ({
           type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
           text: line.trim()
@@ -88,7 +76,7 @@ export default function Dashboard() {
         setChatMessages(crewMessages);
       }
 
-      loadHistory(user.id); // Refresh history
+      loadHistory(user.id);
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
@@ -103,30 +91,24 @@ export default function Dashboard() {
 
     try {
       const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_path);
-      if (!fileData) throw new Error("File not found");
+      if (!fileData) throw new Error();
 
       const file = new File([fileData], offer.file_name, { type: 'image/jpeg' });
-
       const formData = new FormData();
       formData.append('files', file);
 
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
+      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+      const result = await res.json();
 
       if (result.crewResponse) {
-        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
+        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
         const crewMessages = lines.map((line: string, i: number) => ({
           type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
           text: line.trim()
         }));
         setChatMessages(crewMessages);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble re-analyzing that piece." }]);
     }
   };
@@ -144,7 +126,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -165,19 +146,31 @@ export default function Dashboard() {
         {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
-          <div className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
-            onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => document.getElementById('fileInput')?.click()}>
+          <div 
+            className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => document.getElementById('fileInput')?.click()}
+          >
             <div className="text-6xl mb-6">📄</div>
             <p className="text-lg font-medium text-gray-700 mb-2">Drop mail here</p>
             <p className="text-gray-500 mb-8">or click to browse</p>
+            
             <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">Browse Files</button>
+            
+            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">
+              Browse Files
+            </button>
           </div>
 
           {selectedFiles.length > 0 && (
             <div className="mt-6 text-center">
               <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
-              <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
+              <button 
+                onClick={analyzeWithCrew}
+                disabled={uploading}
+                className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
+              >
                 {uploading ? 'Analyzing...' : 'Send to the Crew →'}
               </button>
             </div>
@@ -197,7 +190,11 @@ export default function Dashboard() {
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
                     {msg.type !== 'system' && (
-                      <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
+                      <img 
+                        src={getIconPath(msg.type)} 
+                        alt={msg.type}
+                        className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
+                      />
                     )}
                     <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
                       {msg.text}

@@ -3,8 +3,6 @@ import REFERENCE_GUIDE from '../../lib/reference-guide';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("=== OFFERCREW ANALYSIS STARTED ===");
-
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
@@ -12,13 +10,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Process first file for now
     const file = files[0];
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
 
-    // Grok Vision Analysis
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -30,61 +26,36 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew. Analyze the image and return a structured summary.
+            content: `You are OfferCrew — four robots reacting to financial junk mail.
 
 ${REFERENCE_GUIDE}
 
-Return your response as a natural group chat, but also include clear extraction at the top in this format:
-
-LENDER: [Company Name]
-PRODUCT_TYPE: [Credit Card / Home Equity / Personal Loan / etc.]
-IS_PREAPPROVED: [true/false]
-LEDGER_SCORE: [X.X]
-
-Then continue with the full crew banter.`
+IMPORTANT: Do NOT include metadata labels like LENDER:, PRODUCT_TYPE:, etc. in your final response.
+Only use them internally for analysis. Respond naturally as the Crew.`
           },
           {
             role: "user",
             content: [
               { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
-              { type: "text", text: "Extract key metadata and then react as the full Crew." }
+              { type: "text", text: "Analyze this mail piece as the full OfferCrew. Start with the company name." }
             ]
           }
         ],
-        temperature: 0.7,
+        temperature: 0.8,
         max_tokens: 1100,
       }),
     });
 
     const grokData = await grokResponse.json();
-    const aiText = grokData.choices?.[0]?.message?.content || "Analysis failed";
-
-    // Simple parsing for metadata
-    const lenderMatch = aiText.match(/LENDER:\s*(.+)/i);
-    const productMatch = aiText.match(/PRODUCT_TYPE:\s*(.+)/i);
-    const preapprovedMatch = aiText.match(/IS_PREAPPROVED:\s*(true|false)/i);
-    const scoreMatch = aiText.match(/LEDGER_SCORE:\s*(\d+\.?\d*)/i);
-
-    const metadata = {
-      lender: lenderMatch ? lenderMatch[1].trim() : null,
-      product_type: productMatch ? productMatch[1].trim() : null,
-      is_preapproved: preapprovedMatch ? preapprovedMatch[1].toLowerCase() === 'true' : false,
-      ledger_score: scoreMatch ? parseFloat(scoreMatch[1]) : null,
-    };
-
-    console.log("Extracted Metadata:", metadata);
+    const aiText = grokData.choices?.[0]?.message?.content || "The Crew analyzed it!";
 
     return NextResponse.json({
       success: true,
-      crewResponse: aiText,
-      metadata: metadata
+      crewResponse: aiText
     });
 
   } catch (error) {
-    console.error("💥 ANALYSIS ERROR:", error);
-    return NextResponse.json({ 
-      error: "Analysis failed", 
-      message: error instanceof Error ? error.message : "Unknown error" 
-    }, { status: 500 });
+    console.error("Analysis error:", error);
+    return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   }
 }
