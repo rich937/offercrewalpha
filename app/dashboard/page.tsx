@@ -25,11 +25,9 @@ export default function Dashboard() {
   }, []);
 
   const loadHistory = async () => {
-    // TODO: Later we'll pull real history from Supabase
     setHistory([
       { id: 1, lender: "Figure", sequence: "034982", score: "7.8", date: "2 days ago" },
       { id: 2, lender: "Capital One", sequence: "119284", score: "5.4", date: "1 week ago" },
-      { id: 3, lender: "Discover", sequence: "887421", score: "8.1", date: "2 weeks ago" },
     ]);
   };
 
@@ -98,7 +96,7 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
         
-        {/* LEFT: Upload Interface */}
+        {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
           <div 
@@ -132,10 +130,10 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Crew Chat */}
-        <div className="flex-1 flex flex-col">
+        {/* CENTER: Scrollable Crew Chat */}
+        <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Reactions</h2>
-          <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
             <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
               <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-5 text-white">
                 <div className="flex justify-between items-center">
@@ -149,10 +147,23 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-4">
+              {/* Scrollable Chat Area */}
+              <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-4 scrollbar-thin scrollbar-thumb-gray-300" style={{ maxHeight: '620px' }}>
                 {chatMessages.map((msg, i) => (
-                  <div key={i} className={`p-4 rounded-2xl ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
-                    {msg.text}
+                  <div key={i} className={`flex gap-3 ${msg.type === 'system' ? 'justify-center' : ''}`}>
+                    {msg.type !== 'system' && (
+                      <div className="w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white mt-1"
+                        style={{
+                          backgroundColor: msg.type === 'ledger' ? '#3b82f6' : 
+                                         msg.type === 'spark' ? '#f97316' : 
+                                         msg.type === 'shade' ? '#8b5cf6' : '#ef4444'
+                        }}>
+                        {msg.type === 'ledger' ? 'L' : msg.type === 'spark' ? 'S' : msg.type === 'shade' ? 'H' : 'C'}
+                      </div>
+                    )}
+                    <div className={`p-4 rounded-2xl flex-1 ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
+                      {msg.text}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -160,10 +171,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* RIGHT: Previous Offers Catalog */}
+        {/* RIGHT: History */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto" style={{ maxHeight: '620px' }}>
             {history.map((item) => (
               <div key={item.id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-300 cursor-pointer transition-colors">
                 <div className="flex justify-between items-start">
