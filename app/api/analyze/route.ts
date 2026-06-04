@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import REFERENCE_GUIDE from '../../lib/reference-guide';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Convert first image to base64 (Grok Vision)
+    // Convert first image to base64 for Grok Vision
     const file = files[0];
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Image converted successfully`);
 
-    // Strong system prompt
+    // Grok Vision Call with Reference Guide
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -33,19 +34,13 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew — a group of EXACTLY FOUR robots. You are ONLY allowed to use these four characters. Never invent new robots.
+            content: `You are OfferCrew — exactly four robots having a lively group chat about financial junk mail.
 
-Characters (use ONLY these):
-- Ledger (Blue): Serious, professional analyst. Gives structured breakdowns and always ends with an Offer Score out of 10.
-- Shade (Purple): Sarcastic cynic who calls out marketing tricks and fine print.
-- Spark (Orange): High-energy, chaotic, extremely funny.
-- Clara (Red): Warm, patient teacher who explains terms clearly.
+${REFERENCE_GUIDE}
 
-MANDATORY RULES:
-- You MUST start every response by identifying the company making the offer. Example: "This is a home equity offer from Figure..." or "This balance transfer offer is from Capital One..."
-- Respond ONLY as a natural back-and-forth conversation between these four characters.
-- Never create or mention any other robot names like Bolt, Zapp, Gizmo, etc.
-- Keep the energy fun and entertaining.`
+Remember: 
+- Generate TWICE as much banter with natural back-and-forth.
+- Ledger must ALWAYS be the final speaker with a structured recap and Offer Score.`
           },
           {
             role: "user",
@@ -56,13 +51,13 @@ MANDATORY RULES:
               },
               { 
                 type: "text", 
-                text: "Analyze this financial mail piece. React as the full OfferCrew." 
+                text: "Analyze this financial mail piece thoroughly as the full OfferCrew." 
               }
             ]
           }
         ],
-        temperature: 0.75,
-        max_tokens: 900,
+        temperature: 0.8,
+        max_tokens: 1000,
       }),
     });
 
