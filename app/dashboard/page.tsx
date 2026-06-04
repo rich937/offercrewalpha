@@ -25,10 +25,15 @@ export default function Dashboard() {
   }, []);
 
   const loadHistory = async () => {
-    setHistory([
-      { id: 1, lender: "Figure", sequence: "034982", score: "7.8", date: "2 days ago" },
-      { id: 2, lender: "Capital One", sequence: "119284", score: "5.4", date: "1 week ago" },
-    ]);
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('mail-pieces')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    setHistory(data || []);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,13 +45,52 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-    const analyzeWithCrew = async () => {
+  const analyzeFile = async (filePath: string, displayName: string) => {
+    setChatMessages([{ type: 'system', text: `Re-analyzing ${displayName}...` }]);
+
+    try {
+      const { data: fileData } = await supabase.storage.from('mail-pieces').download(filePath);
+      if (!fileData) throw new Error("File not found");
+
+      const file = new File([fileData], displayName, { type: 'image/jpeg' });
+
+      const formData = new FormData();
+      formData.append('files', file);
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.crewResponse) {
+        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          text: line.trim()
+        }));
+
+        setChatMessages(crewMessages);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages([{ type: 'system', text: "Sorry, I had trouble re-analyzing that piece." }]);
+    }
+  };
+
+  const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
+      for (const file of selectedFiles) {
+        const fileName = `${user.id}/${Date.now()}-${file.name}`;
+        await supabase.storage.from('mail-pieces').upload(fileName, file);
+      }
+
       const formData = new FormData();
       selectedFiles.forEach(file => formData.append('files', file));
 
@@ -59,24 +103,15 @@ export default function Dashboard() {
 
       if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
-        
-        const crewMessages = lines.map((line: string) => {
-          const lower = line.toLowerCase();
-          let type = 'spark'; // default
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          text: line.trim()
+        }));
 
-          if (lower.includes('ledger') || lower.includes('score:')) type = 'ledger';
-          else if (lower.includes('shade')) type = 'shade';
-          else if (lower.includes('clara')) type = 'clara';
-          else if (lower.includes('spark')) type = 'spark';
-
-          return {
-            type,
-            text: line.trim()
-          };
-        });
-
-        setChatMessages(prev => [...prev, ...crewMessages]);
+        setChatMessages(crewMessages);
       }
+
+      loadHistory(); // Refresh history
     } catch (err) {
       console.error(err);
       setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
@@ -88,18 +123,17 @@ export default function Dashboard() {
 
   const getIconPath = (type: string) => {
     const t = type.toLowerCase();
-    if (t.includes('ledger') || t === 'l') return '/icons/Ledger Icon.png';
-    if (t.includes('spark') || t === 's') return '/icons/Spark Icon.png';
-    if (t.includes('shade') || t === 'h') return '/icons/Shade Icon.png';
-    if (t.includes('clara') || t === 'c') return '/icons/Clara Icon.png';
-    return '/icons/Ledger Icon.png'; // fallback
+    if (t.includes('ledger')) return '/icons/Ledger Icon.png';
+    if (t.includes('spark')) return '/icons/Spark Icon.png';
+    if (t.includes('shade')) return '/icons/Shade Icon.png';
+    if (t.includes('clara')) return '/icons/Clara Icon.png';
+    return '/icons/Ledger Icon.png';
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Nav remains the same */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -152,11 +186,7 @@ export default function Dashboard() {
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
                     {msg.type !== 'system' && (
-                      <img 
-                        src={getIconPath(msg.type)} 
-                        alt={msg.type}
-                        className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
-                      />
+                      <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
                     )}
                     <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
                       {msg.text}
@@ -168,23 +198,32 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* RIGHT: History */}
+        {/* RIGHT: Previous Offers */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
-          <div className="space-y-4 overflow-y-auto" style={{ maxHeight: '620px' }}>
-            {history.map((item) => (
-              <div key={item.id} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-300 cursor-pointer transition-colors">
-                <div className="flex justify-between items-start">
+          <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '620px' }}>
+            {history.length === 0 && (
+              <p className="text-gray-400 text-center py-8">No offers yet. Upload your first one!</p>
+            )}
+            
+            {history.map((item, index) => (
+              <div 
+                key={item.id} 
+                onClick={() => analyzeFile(item.file_path, item.file_name)}
+                className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
+              >
+                <div className="flex justify-between">
                   <div>
-                    <p className="font-semibold text-lg">{item.lender}</p>
-                    <p className="text-sm text-gray-500">#{item.sequence}</p>
+                    <p className="font-semibold">{item.lender || item.file_name.split('-')[0]}</p>
+                    <p className="text-sm text-gray-500">#{String(item.sequence_number || (history.length - index)).padStart(6, '0')}</p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-cyan-600">{item.score}</div>
-                    <div className="text-xs text-gray-500">Ledger Score</div>
-                  </div>
+                  {item.ledger_score && (
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-cyan-600">{item.ledger_score}</div>
+                      <div className="text-xs text-gray-500">Ledger Score</div>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400 mt-3">{item.date}</p>
               </div>
             ))}
           </div>
