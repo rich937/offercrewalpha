@@ -18,17 +18,19 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       setLoading(false);
-      if (user) loadHistory(user.id);
+      if (user) await loadHistory(user.id);
     };
     init();
   }, []);
 
   const loadHistory = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('offers')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    if (error) console.error("History load error:", error);
     setHistory(data || []);
   };
 
@@ -50,31 +52,29 @@ export default function Dashboard() {
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'upload_mail', {
-        event_category: 'Engagement',
-        event_label: 'Send to Crew Button',
-        value: selectedFiles.length
-      });
-    }
-
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
+      // Upload files and save to database
       for (const file of selectedFiles) {
         const filePath = `${user.id}/${Date.now()}-${file.name}`;
-        await supabase.storage.from('mail-pieces').upload(filePath, file);
+        
+        const { error: uploadError } = await supabase.storage.from('mail-pieces').upload(filePath, file);
+        if (uploadError) console.error("Upload error:", uploadError);
 
-        await supabase.from('offers').insert({
+        const { error: insertError } = await supabase.from('offers').insert({
           user_id: user.id,
           file_path: filePath,
           file_name: file.name,
           lender: 'Pending',
           sequence_number: Date.now()
         });
+
+        if (insertError) console.error("Insert error:", insertError);
       }
 
+      // Analyze with Crew
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
@@ -97,7 +97,9 @@ export default function Dashboard() {
         setChatMessages(crewMessages);
       }
 
-      loadHistory(user.id);
+      // Refresh history immediately
+      await loadHistory(user.id);
+
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
@@ -112,7 +114,7 @@ export default function Dashboard() {
 
     try {
       const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_path);
-      if (!fileData) throw new Error();
+      if (!fileData) throw new Error("File not found");
 
       const file = new File([fileData], offer.file_name, { type: 'image/jpeg' });
       const formData = new FormData();
@@ -170,7 +172,6 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
-        
         {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-4">Upload Mail</h2>
@@ -216,11 +217,7 @@ export default function Dashboard() {
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
                     {msg.type !== 'system' && (
-                      <img 
-                        src={getIconPath(msg.type)} 
-                        alt={msg.type}
-                        className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
-                      />
+                      <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
                     )}
                     <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
                       {msg.text}
