@@ -34,7 +34,7 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).slice(0, 4); // Limit to 4 images
+      const files = Array.from(e.target.files).slice(0, 4);
       setSelectedFiles(files);
     }
   };
@@ -50,13 +50,11 @@ export default function Dashboard() {
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
-    // Google Analytics Tracking
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'upload_mail', {
         event_category: 'Engagement',
         event_label: 'Send to Crew Button',
-        value: selectedFiles.length,
-        files_count: selectedFiles.length
+        value: selectedFiles.length
       });
     }
 
@@ -85,14 +83,22 @@ export default function Dashboard() {
 
       if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
-        const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
-          text: line.trim()
-        }));
+        
+        const crewMessages = lines.map((line: string) => {
+          const cleanLine = line.trim();
+          let type = 'spark'; // default
+
+          const lower = cleanLine.toLowerCase();
+          if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
+          else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
+          else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
+          else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
+
+          return { type, text: cleanLine };
+        });
+
         setChatMessages(crewMessages);
       }
-
-      loadHistory(user.id);
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
@@ -100,6 +106,7 @@ export default function Dashboard() {
 
     setSelectedFiles([]);
     setUploading(false);
+    loadHistory(user.id);
   };
 
   const loadPastOffer = async (offer: any) => {
@@ -118,10 +125,17 @@ export default function Dashboard() {
 
       if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
-        const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
-          text: line.trim()
-        }));
+        const crewMessages = lines.map((line: string) => {
+          const cleanLine = line.trim();
+          let type = 'spark';
+          const lower = cleanLine.toLowerCase();
+          if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
+          else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
+          else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
+          else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
+
+          return { type, text: cleanLine };
+        });
         setChatMessages(crewMessages);
       }
     } catch (e) {
@@ -162,7 +176,6 @@ export default function Dashboard() {
         {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-4">Upload Mail</h2>
-          
           <div className="mb-6 text-sm text-gray-600">
             <p className="font-medium mb-2">Best results with up to 4 photos:</p>
             <ul className="list-disc pl-5 space-y-1 text-xs">
@@ -173,40 +186,19 @@ export default function Dashboard() {
             </ul>
           </div>
 
-          <div 
-            className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => document.getElementById('fileInput')?.click()}
-          >
+          <div className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
+            onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => document.getElementById('fileInput')?.click()}>
             <div className="text-6xl mb-6">📄</div>
             <p className="text-lg font-medium text-gray-700 mb-1">Drop mail photos here</p>
             <p className="text-gray-500 mb-6">Max 4 images</p>
-            
-            <input 
-              id="fileInput" 
-              type="file" 
-              accept="image/*" 
-              multiple 
-              className="hidden" 
-              onChange={handleFileSelect} 
-            />
-            
-            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">
-              Browse Files
-            </button>
+            <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">Browse Files</button>
           </div>
 
           {selectedFiles.length > 0 && (
             <div className="mt-6 text-center">
-              <p className="font-medium mb-3">
-                {selectedFiles.length} / 4 file(s) selected
-              </p>
-              <button 
-                onClick={analyzeWithCrew}
-                disabled={uploading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
-              >
+              <p className="font-medium mb-3">{selectedFiles.length} / 4 file(s) selected</p>
+              <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
                 {uploading ? 'Analyzing...' : 'Send to the Crew →'}
               </button>
             </div>
@@ -261,12 +253,6 @@ export default function Dashboard() {
                     <p className="font-semibold text-lg">{offer.lender || 'Mail Piece'}</p>
                     <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
                   </div>
-                  {offer.ledger_score && (
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-cyan-600">{offer.ledger_score}</div>
-                      <div className="text-xs text-gray-500">Ledger Score</div>
-                    </div>
-                  )}
                 </div>
                 <p className="text-xs text-gray-400 mt-3">
                   {new Date(offer.created_at).toLocaleDateString()}
