@@ -9,21 +9,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Convert files to base64 for Grok Vision
-    const imageContents = [];
+    // Convert images to base64
+    const imageMessages = [];
 
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
-      const mimeType = file.type || 'image/jpeg';
+      const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
 
-      imageContents.push({
-        type: "input_image",
-        image_url: `data:${mimeType};base64,${base64}`
+      imageMessages.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${mimeType};base64,${base64}`
+        }
       });
     }
 
-    // Real Grok Vision Call with your Character Bible
+    // Real Grok Vision Call
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -31,36 +33,38 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "grok-3",   // or grok-4 if you have access
+        model: "grok-3",
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew — a lively group of 4 robots reacting to financial junk mail.
+            content: `You are OfferCrew: 4 fun robots reacting to financial junk mail in a lively group chat.
 
 - Spark (Orange): High-energy, chaotic, extremely funny
-- Shade (Purple): Sarcastic cynic who calls out tricks and fine print
-- Clara (Red): Warm, patient teacher who explains terms clearly
-- Ledger (Blue): Serious professional who gives Offer Score out of 10 and structured summary
+- Shade (Purple): Sarcastic cynic, calls out tricks
+- Clara (Red): Warm teacher, explains terms
+- Ledger (Blue): Serious analyst, gives Offer Score /10
 
-Respond in natural, back-and-forth group chat style with lots of banter.`
+Natural banter, entertaining reactions.`
           },
           {
             role: "user",
             content: [
-              ...imageContents,
-              { 
-                type: "input_text", 
-                text: "Analyze this financial mail piece. Describe what you see and give your reactions." 
-              }
+              ...imageMessages,
+              { type: "text", text: "Analyze this financial mail piece. What do you see? React as the Crew." }
             ]
           }
         ],
-        temperature: 0.85,
+        temperature: 0.8,
+        max_tokens: 800,
       }),
     });
 
+    if (!grokResponse.ok) {
+      throw new Error(`Grok API error: ${grokResponse.status}`);
+    }
+
     const grokData = await grokResponse.json();
-    const aiText = grokData.choices?.[0]?.message?.content || "The Crew analyzed the mail!";
+    const aiText = grokData.choices?.[0]?.message?.content || "The Crew is analyzing it...";
 
     return NextResponse.json({
       success: true,
