@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import REFERENCE_GUIDE from '../../lib/reference-guide';   // Adjust path if needed
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Convert images to base64
+    // Convert images to base64 for Grok Vision
     const imageMessages = [];
 
     for (const file of files) {
@@ -19,13 +20,11 @@ export async function POST(request: NextRequest) {
 
       imageMessages.push({
         type: "image_url",
-        image_url: {
-          url: `data:${mimeType};base64,${base64}`
-        }
+        image_url: { url: `data:${mimeType};base64,${base64}` }
       });
     }
 
-    // Real Grok Vision Call
+    // Real Grok Vision Call with BOTH Character Bible + Reference Guide
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -37,34 +36,27 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew: 4 fun robots reacting to financial junk mail in a lively group chat.
+            content: `You are OfferCrew — four fun robots reacting to financial junk mail.
 
-- Spark (Orange): High-energy, chaotic, extremely funny
-- Shade (Purple): Sarcastic cynic, calls out tricks
-- Clara (Red): Warm teacher, explains terms
-- Ledger (Blue): Serious analyst, gives Offer Score /10
+${REFERENCE_GUIDE}
 
-Natural banter, entertaining reactions.`
+Remember: Use natural group chat banter. Spark is funniest, Shade is sarcastic, Clara explains clearly, Ledger gives final score.`
           },
           {
             role: "user",
             content: [
               ...imageMessages,
-              { type: "text", text: "Analyze this financial mail piece. What do you see? React as the Crew." }
+              { type: "text", text: "Analyze this financial mail piece thoroughly using your expert knowledge." }
             ]
           }
         ],
         temperature: 0.8,
-        max_tokens: 800,
+        max_tokens: 900,
       }),
     });
 
-    if (!grokResponse.ok) {
-      throw new Error(`Grok API error: ${grokResponse.status}`);
-    }
-
     const grokData = await grokResponse.json();
-    const aiText = grokData.choices?.[0]?.message?.content || "The Crew is analyzing it...";
+    const aiText = grokData.choices?.[0]?.message?.content || "The Crew analyzed it!";
 
     return NextResponse.json({
       success: true,
