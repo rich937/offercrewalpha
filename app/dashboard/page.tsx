@@ -40,7 +40,7 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-  const analyzeWithCrew = async () => {
+    const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -60,12 +60,20 @@ export default function Dashboard() {
       if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
         
-        const speakerOrder = ['spark', 'shade', 'clara', 'ledger'];
-        
-        const crewMessages = lines.map((line: string, i: number) => ({
-          type: speakerOrder[i % 4],
-          text: line.trim()
-        }));
+        const crewMessages = lines.map((line: string) => {
+          const lower = line.toLowerCase();
+          let type = 'spark'; // default
+
+          if (lower.includes('ledger') || lower.includes('score:')) type = 'ledger';
+          else if (lower.includes('shade')) type = 'shade';
+          else if (lower.includes('clara')) type = 'clara';
+          else if (lower.includes('spark')) type = 'spark';
+
+          return {
+            type,
+            text: line.trim()
+          };
+        });
 
         setChatMessages(prev => [...prev, ...crewMessages]);
       }
