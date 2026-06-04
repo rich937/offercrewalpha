@@ -59,10 +59,14 @@ export default function Dashboard() {
 
       if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 5);
-        const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4] as string,
-          text: line.trim()
-        }));
+        
+        const crewMessages = lines.map((line: string, i: number) => {
+          const types = ['spark', 'shade', 'clara', 'ledger'];
+          return {
+            type: types[i % 4],
+            text: line.trim()
+          };
+        });
 
         setChatMessages(prev => [...prev, ...crewMessages]);
       }
@@ -81,7 +85,7 @@ export default function Dashboard() {
       case 'spark': return '/icons/Spark Icon.png';
       case 'shade': return '/icons/Shade Icon.png';
       case 'clara': return '/icons/Clara Icon.png';
-      default: return '';
+      default: return '/icons/Ledger Icon.png';
     }
   };
 
@@ -106,10 +110,9 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
         
-        {/* LEFT: Upload */}
+        {/* LEFT: Upload Interface */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
-          {/* Upload UI remains the same */}
           <div 
             className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
             onDrop={handleDrop}
@@ -141,7 +144,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Chat */}
+        {/* CENTER: Crew Chat */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Reactions</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
@@ -152,7 +155,7 @@ export default function Dashboard() {
 
               <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '620px' }}>
                 {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : ''}`}>
+                  <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
                     {msg.type !== 'system' && (
                       <img 
                         src={getIconPath(msg.type)} 
@@ -160,7 +163,7 @@ export default function Dashboard() {
                         className="w-10 h-10 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
                       />
                     )}
-                    <div className={`p-4 rounded-3xl flex-1 max-w-[80%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
+                    <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
                       {msg.text}
                     </div>
                   </div>
