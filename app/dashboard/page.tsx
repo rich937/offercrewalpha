@@ -83,11 +83,9 @@ export default function Dashboard() {
 
       if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
-        
         const crewMessages = lines.map((line: string) => {
           const cleanLine = line.trim();
-          let type = 'spark'; // default
-
+          let type = 'spark';
           const lower = cleanLine.toLowerCase();
           if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
           else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
@@ -96,9 +94,10 @@ export default function Dashboard() {
 
           return { type, text: cleanLine };
         });
-
         setChatMessages(crewMessages);
       }
+
+      loadHistory(user.id);
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
@@ -106,7 +105,6 @@ export default function Dashboard() {
 
     setSelectedFiles([]);
     setUploading(false);
-    loadHistory(user.id);
   };
 
   const loadPastOffer = async (offer: any) => {
