@@ -19,18 +19,16 @@ export default function Dashboard() {
       setUser(user);
       setLoading(false);
       if (!user) window.location.href = '/login';
+      else loadHistory(user.id);
     };
     getUser();
-    loadHistory();
   }, []);
 
-  const loadHistory = async () => {
-    if (!user) return;
-    
+  const loadHistory = async (userId: string) => {
     const { data } = await supabase
-      .from('mail-pieces')
+      .from('offers')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     setHistory(data || []);
@@ -45,14 +43,69 @@ export default function Dashboard() {
     if (e.dataTransfer.files) setSelectedFiles(Array.from(e.dataTransfer.files));
   };
 
-  const analyzeFile = async (filePath: string, displayName: string) => {
-    setChatMessages([{ type: 'system', text: `Re-analyzing ${displayName}...` }]);
+  const analyzeWithCrew = async () => {
+    if (selectedFiles.length === 0) return;
+
+    setUploading(true);
+    setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
-      const { data: fileData } = await supabase.storage.from('mail-pieces').download(filePath);
+      const newEntries = [];
+
+      for (const file of selectedFiles) {
+        const filePath = `${user.id}/${Date.now()}-${file.name}`;
+        await supabase.storage.from('mail-pieces').upload(filePath, file);
+
+        // Save to offers table
+        const { data: offer } = await supabase
+          .from('offers')
+          .insert({
+            user_id: user.id,
+            file_path: filePath,
+            file_name: file.name,
+            lender: file.name.split('-')[0] || 'Unknown',
+            sequence_number: Math.floor(Math.random() * 999999) + 1 // temporary - we'll improve this
+          })
+          .select()
+          .single();
+
+        if (offer) newEntries.push(offer);
+      }
+
+      // Analyze
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append('files', file));
+
+      const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+      const result = await response.json();
+
+      if (result.crewResponse) {
+        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
+        const crewMessages = lines.map((line: string, i: number) => ({
+          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
+          text: line.trim()
+        }));
+        setChatMessages(crewMessages);
+      }
+
+      loadHistory(user.id); // Refresh history
+    } catch (err) {
+      console.error(err);
+      setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
+    }
+
+    setSelectedFiles([]);
+    setUploading(false);
+  };
+
+  const loadPastOffer = async (offer: any) => {
+    setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.file_name}...` }]);
+
+    try {
+      const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_path);
       if (!fileData) throw new Error("File not found");
 
-      const file = new File([fileData], displayName, { type: 'image/jpeg' });
+      const file = new File([fileData], offer.file_name, { type: 'image/jpeg' });
 
       const formData = new FormData();
       formData.append('files', file);
@@ -70,55 +123,12 @@ export default function Dashboard() {
           type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
           text: line.trim()
         }));
-
         setChatMessages(crewMessages);
       }
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble re-analyzing that piece." }]);
     }
-  };
-
-  const analyzeWithCrew = async () => {
-    if (selectedFiles.length === 0) return;
-
-    setUploading(true);
-    setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
-
-    try {
-      for (const file of selectedFiles) {
-        const fileName = `${user.id}/${Date.now()}-${file.name}`;
-        await supabase.storage.from('mail-pieces').upload(fileName, file);
-      }
-
-      const formData = new FormData();
-      selectedFiles.forEach(file => formData.append('files', file));
-
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (result.crewResponse) {
-        const lines = result.crewResponse.split('\n').filter((line: string) => line.trim().length > 8);
-        const crewMessages = lines.map((line: string, i: number) => ({
-          type: ['spark', 'shade', 'clara', 'ledger'][i % 4],
-          text: line.trim()
-        }));
-
-        setChatMessages(crewMessages);
-      }
-
-      loadHistory(); // Refresh history
-    } catch (err) {
-      console.error(err);
-      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
-    }
-
-    setSelectedFiles([]);
-    setUploading(false);
   };
 
   const getIconPath = (type: string) => {
@@ -134,6 +144,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -201,29 +212,32 @@ export default function Dashboard() {
         {/* RIGHT: Previous Offers */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
-          <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '620px' }}>
+          <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
             {history.length === 0 && (
-              <p className="text-gray-400 text-center py-8">No offers yet. Upload your first one!</p>
+              <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
             )}
-            
-            {history.map((item, index) => (
+
+            {history.map((offer) => (
               <div 
-                key={item.id} 
-                onClick={() => analyzeFile(item.file_path, item.file_name)}
+                key={offer.id}
+                onClick={() => loadPastOffer(offer)}
                 className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
               >
-                <div className="flex justify-between">
+                <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-semibold">{item.lender || item.file_name.split('-')[0]}</p>
-                    <p className="text-sm text-gray-500">#{String(item.sequence_number || (history.length - index)).padStart(6, '0')}</p>
+                    <p className="font-semibold text-lg">{offer.lender || 'Mail Piece'}</p>
+                    <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
                   </div>
-                  {item.ledger_score && (
+                  {offer.ledger_score && (
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-cyan-600">{item.ledger_score}</div>
+                      <div className="text-2xl font-bold text-cyan-600">{offer.ledger_score}</div>
                       <div className="text-xs text-gray-500">Ledger Score</div>
                     </div>
                   )}
                 </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  {new Date(offer.created_at).toLocaleDateString()}
+                </p>
               </div>
             ))}
           </div>
