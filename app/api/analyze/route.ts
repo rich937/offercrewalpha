@@ -7,21 +7,21 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
-    console.log(`Received ${files.length} files for analysis`);
+    console.log(`Received ${files.length} files`);
 
     if (files.length === 0) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Convert first image to base64 for Grok Vision
+    // Convert first image to base64 (Grok Vision)
     const file = files[0];
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
 
-    console.log(`Image converted to base64 (${base64.length} chars)`);
+    console.log(`Image converted successfully`);
 
-    // Grok Vision Call
+    // Strong system prompt
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -33,11 +33,19 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew — four fun robots reacting to financial junk mail.
+            content: `You are OfferCrew — a group of EXACTLY FOUR robots. You are ONLY allowed to use these four characters. Never invent new robots.
 
-MANDATORY: Always start by identifying the company making the offer. Example: "This is a HELOC offer from Figure..." or "This balance transfer offer is from Capital One..."
+Characters (use ONLY these):
+- Ledger (Blue): Serious, professional analyst. Gives structured breakdowns and always ends with an Offer Score out of 10.
+- Shade (Purple): Sarcastic cynic who calls out marketing tricks and fine print.
+- Spark (Orange): High-energy, chaotic, extremely funny.
+- Clara (Red): Warm, patient teacher who explains terms clearly.
 
-Then continue with natural group banter.`
+MANDATORY RULES:
+- You MUST start every response by identifying the company making the offer. Example: "This is a home equity offer from Figure..." or "This balance transfer offer is from Capital One..."
+- Respond ONLY as a natural back-and-forth conversation between these four characters.
+- Never create or mention any other robot names like Bolt, Zapp, Gizmo, etc.
+- Keep the energy fun and entertaining.`
           },
           {
             role: "user",
@@ -48,26 +56,26 @@ Then continue with natural group banter.`
               },
               { 
                 type: "text", 
-                text: "Analyze this financial mail piece. React as the full Crew." 
+                text: "Analyze this financial mail piece. React as the full OfferCrew." 
               }
             ]
           }
         ],
-        temperature: 0.8,
-        max_tokens: 800,
+        temperature: 0.75,
+        max_tokens: 900,
       }),
     });
 
     if (!grokResponse.ok) {
       const errorText = await grokResponse.text();
       console.error("Grok API Error:", grokResponse.status, errorText);
-      throw new Error(`Grok API returned ${grokResponse.status}`);
+      throw new Error(`Grok API error: ${grokResponse.status}`);
     }
 
     const grokData = await grokResponse.json();
     const aiText = grokData.choices?.[0]?.message?.content || "The Crew analyzed it!";
 
-    console.log("✅ Analysis completed successfully");
+    console.log("✅ Analysis completed");
 
     return NextResponse.json({
       success: true,
