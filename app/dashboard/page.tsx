@@ -50,6 +50,14 @@ export default function Dashboard() {
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
+    if (typeof window !== 'undefined' && (window as any).gtag) {
+      (window as any).gtag('event', 'upload_mail', {
+        event_category: 'Engagement',
+        event_label: 'Send to Crew Button',
+        value: selectedFiles.length
+      });
+    }
+
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
@@ -166,6 +174,21 @@ export default function Dashboard() {
         {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-4">Upload Mail</h2>
+          
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
+            <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
+            <p className="text-amber-700 mb-4">
+              For your protection, please <strong>redact with a black Sharpie</strong>:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 text-amber-700 text-xs">
+              <li>Your full name and street address</li>
+              <li>Any personal account numbers</li>
+            </ul>
+            <p className="mt-4 text-amber-700 text-xs">
+              <strong>Leave visible:</strong> Offer rates, terms, fine print, company name, and especially the <strong>QR code</strong> — so you can easily respond to the offer later if you want.
+            </p>
+          </div>
+
           <div className="mb-6 text-sm text-gray-600">
             <p className="font-medium mb-2">Best results with up to 4 photos:</p>
             <ul className="list-disc pl-5 space-y-1 text-xs">
