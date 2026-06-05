@@ -12,6 +12,7 @@ export default function Dashboard() {
     { type: 'system', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
   const [history, setHistory] = useState<any[]>([]);
+  const [userInput, setUserInput] = useState('');
 
   useEffect(() => {
     const init = async () => {
@@ -49,14 +50,6 @@ export default function Dashboard() {
 
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
-
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'upload_mail', {
-        event_category: 'Engagement',
-        event_label: 'Send to Crew Button',
-        value: selectedFiles.length
-      });
-    }
 
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
@@ -105,6 +98,27 @@ export default function Dashboard() {
 
     setSelectedFiles([]);
     setUploading(false);
+  };
+
+  const sendUserMessage = async () => {
+    if (!userInput.trim()) return;
+
+    setChatMessages(prev => [...prev, { type: 'user', text: userInput }]);
+    const question = userInput;
+    setUserInput('');
+
+    // For now, send to Grok for a response from the Crew
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      // In a future version we can make a dedicated chat endpoint
+      setChatMessages(prev => [...prev, { type: 'system', text: "The Crew is thinking about your question..." }]);
+    } catch (e) {
+      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I couldn't respond to that right now." }]);
+    }
   };
 
   const loadPastOffer = async (offer: any) => {
@@ -174,7 +188,6 @@ export default function Dashboard() {
         {/* LEFT: Upload */}
         <div className="w-80 flex-shrink-0">
           <h2 className="text-xl font-semibold mb-4">Upload Mail</h2>
-          
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
             <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
             <p className="text-amber-700 mb-4">
@@ -187,16 +200,6 @@ export default function Dashboard() {
             <p className="mt-4 text-amber-700 text-xs">
               <strong>Leave visible:</strong> Offer rates, terms, fine print, company name, and especially the <strong>QR code</strong> — so you can easily respond to the offer later if you want.
             </p>
-          </div>
-
-          <div className="mb-6 text-sm text-gray-600">
-            <p className="font-medium mb-2">Best results with up to 4 photos:</p>
-            <ul className="list-disc pl-5 space-y-1 text-xs">
-              <li>Front of the envelope</li>
-              <li>Front of the main letter/offer</li>
-              <li>Back of the letter (if text)</li>
-              <li>Schumer Box (if present)</li>
-            </ul>
           </div>
 
           <div className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
@@ -218,7 +221,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Chat */}
+        {/* CENTER: Fixed Size Chat */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Reactions</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
@@ -227,7 +230,8 @@ export default function Dashboard() {
                 <h3 className="font-semibold text-lg">OfferCrew</h3>
               </div>
 
-              <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '620px' }}>
+              {/* Fixed height scrollable chat */}
+              <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
                     {msg.type !== 'system' && (
@@ -238,6 +242,26 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Persistent Chat Input Bar */}
+              <div className="border-t p-4 bg-white">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()}
+                    placeholder="Ask the Crew a question..."
+                    className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  />
+                  <button
+                    onClick={sendUserMessage}
+                    className="px-6 bg-black text-white rounded-2xl font-medium hover:bg-gray-800"
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
             </div>
           </div>
