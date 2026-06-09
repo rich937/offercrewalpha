@@ -130,7 +130,12 @@ export default function Dashboard() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, latestOfferId: latestOffer?.id })
+        body: JSON.stringify({ 
+          question,
+          latestOfferId: latestOffer?.id,
+          // Pass file paths so the backend can re-download images for context
+          filePaths: latestOffer?.file_paths 
+        })
       });
 
       const result = await res.json();
@@ -151,7 +156,7 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error(err);
-      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now." }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now. Can you try again?" }]);
     }
 
     setIsResponding(false);
@@ -162,12 +167,12 @@ export default function Dashboard() {
     setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.lender || 'offer'}...` }]);
 
     try {
-      // For now we re-analyze the first image
       if (offer.file_paths && offer.file_paths.length > 0) {
+        const formData = new FormData();
+        // Download first image for re-analysis
         const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_paths[0]);
         if (fileData) {
           const file = new File([fileData], 'offer.jpg', { type: 'image/jpeg' });
-          const formData = new FormData();
           formData.append('files', file);
 
           const res = await fetch('/api/analyze', { method: 'POST', body: formData });
@@ -213,6 +218,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation and Tab Bar (same as before) */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -239,7 +245,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'dashboard' && (
           <div className="flex gap-8 h-[calc(100vh-180px)]">
-            {/* LEFT: Upload */}
+            {/* Upload Section */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
@@ -255,28 +261,21 @@ export default function Dashboard() {
               </div>
 
               <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-              <button 
-                onClick={() => document.getElementById('fileInput')?.click()}
-                className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800"
-              >
+              <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
                 📤 Select Photos (max 4)
               </button>
 
               {selectedFiles.length > 0 && (
                 <div className="mt-6">
                   <p className="font-medium mb-4">{selectedFiles.length} photo(s) selected</p>
-                  <button 
-                    onClick={analyzeWithCrew} 
-                    disabled={uploading}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
-                  >
+                  <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
                     {uploading ? 'Analyzing...' : 'Send Offer to the Crew →'}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* CENTER: Chat */}
+            {/* Chat Section */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
                 <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -322,7 +321,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* RIGHT: Previous Offers */}
+            {/* Previous Offers */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
               <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
@@ -330,11 +329,7 @@ export default function Dashboard() {
                   <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
                 )}
                 {history.map((offer) => (
-                  <div 
-                    key={offer.id} 
-                    onClick={() => loadPastOffer(offer)} 
-                    className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
-                  >
+                  <div key={offer.id} onClick={() => loadPastOffer(offer)} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]">
                     <div>
                       <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
                       <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
@@ -354,7 +349,6 @@ export default function Dashboard() {
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl font-bold mb-8">About OfferCrew</h2>
             <p className="text-lg mb-8">We turn boring financial junk mail into hilarious commentary from four AI robots: Ledger, Shade, Spark, and Clara.</p>
-            
             <h3 className="text-2xl font-semibold mt-12 mb-6">Legal Documents</h3>
             <div className="space-y-4 text-lg">
               <Link href="/terms" className="block text-cyan-600 hover:underline">→ Terms of Service</Link>

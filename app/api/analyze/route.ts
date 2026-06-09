@@ -5,25 +5,24 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
-    const question = formData.get('question') as string | null;
 
-    let imageContent: any = null;
-
-    if (files.length > 0) {
-      const file = files[0];
-      const arrayBuffer = await file.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
-      const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
-
-      imageContent = { 
-        type: "image_url", 
-        image_url: { url: `data:${mimeType};base64,${base64}` } 
-      };
+    if (files.length === 0) {
+      return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    const userMessage = question 
-      ? `The user asked: "${question}". Respond in character as the Crew.` 
-      : "Analyze this financial mail piece. Start with the company name.";
+    // Convert first image (or all) to base64 for Grok Vision
+    const imageContents: any[] = [];
+
+    for (const file of files.slice(0, 4)) {
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const mimeType = file.type || 'image/jpeg';
+
+      imageContents.push({
+        type: "image_url",
+        image_url: { url: `data:${mimeType};base64,${base64}` }
+      });
+    }
 
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -40,19 +39,25 @@ export async function POST(request: NextRequest) {
 
 ${REFERENCE_GUIDE}
 
-MANDATORY:
-- Generate plenty of back-and-forth banter (twice as much as normal).
-- Always start by identifying the company.
-- Ledger must ALWAYS be the final speaker with a structured recap and Offer Score out of 10.
-- Never invent new characters.`
+MANDATORY RULES:
+- ALWAYS start your response by clearly identifying the issuer/lender (e.g. "This is a HELOC offer from Figure..." or "This is a balance transfer offer from Capital One...").
+- Extract the lender name as accurately as possible from the images.
+- Then continue with normal group banter.
+- Ledger must ALWAYS give the final structured recap and Offer Score (1-10).`
           },
           {
             role: "user",
-            content: imageContent ? [imageContent, { type: "text", text: userMessage }] : userMessage
+            content: [
+              ...imageContents,
+              { 
+                type: "text", 
+                text: "Analyze this financial mail piece. Identify the lender clearly at the beginning." 
+              }
+            ]
           }
         ],
-        temperature: 0.8,
-        max_tokens: 1100,
+        temperature: 0.7,
+        max_tokens: 1200,
       }),
     });
 
