@@ -43,14 +43,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files) {
-      const files = Array.from(e.dataTransfer.files).slice(0, 4);
-      setSelectedFiles(files);
-    }
-  };
-
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
@@ -229,9 +221,10 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
         
-        {/* LEFT: Upload Interface */}
+        {/* LEFT: Simple Upload */}
         <div className="w-80 flex-shrink-0">
-          <h2 className="text-xl font-semibold mb-4">Upload Mail</h2>
+          <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
+          
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
             <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
             <p className="text-amber-700 mb-4">
@@ -242,26 +235,29 @@ export default function Dashboard() {
               <li>Any personal account numbers</li>
             </ul>
             <p className="mt-4 text-amber-700 text-xs">
-              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong> — so you can easily respond to the offer later if you want.
+              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong>.
             </p>
           </div>
 
-          <div 
-            className="border-2 border-dashed border-gray-300 rounded-3xl h-80 flex flex-col items-center justify-center bg-white hover:border-cyan-400 transition-colors cursor-pointer"
-            onDrop={handleDrop} 
-            onDragOver={(e) => e.preventDefault()} 
+          <input 
+            id="fileInput" 
+            type="file" 
+            accept="image/*" 
+            multiple 
+            className="hidden" 
+            onChange={handleFileSelect} 
+          />
+          
+          <button 
             onClick={() => document.getElementById('fileInput')?.click()}
+            className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800 flex items-center justify-center gap-3"
           >
-            <div className="text-6xl mb-6">📄</div>
-            <p className="text-lg font-medium text-gray-700 mb-1">Drop mail photos here</p>
-            <p className="text-gray-500 mb-6">Max 4 images</p>
-            <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-            <button className="px-8 py-3 bg-black text-white rounded-2xl font-medium hover:bg-gray-800">Browse Files</button>
-          </div>
+            📤 Upload Mail Photos (max 4)
+          </button>
 
           {selectedFiles.length > 0 && (
             <div className="mt-6 text-center">
-              <p className="font-medium mb-3">{selectedFiles.length} / 4 file(s) selected</p>
+              <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
               <button 
                 onClick={analyzeWithCrew} 
                 disabled={uploading} 
@@ -273,12 +269,14 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Fixed Chat Interface */}
+        {/* CENTER: Chat with Logo */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Chat</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
             <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
-              <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-5 text-white">
+              {/* Updated Header with Logo */}
+              <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-5 flex items-center gap-3 text-white">
+                <img src="/logo.png" alt="OfferCrew" className="h-8" />
                 <h3 className="font-semibold text-lg">OfferCrew</h3>
               </div>
 
