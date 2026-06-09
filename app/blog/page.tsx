@@ -11,19 +11,19 @@ const blogPosts = [
     date: "June 9, 2026",
     content: `The OfferCrew has entered the chat.
 
-Ledger:
+Ledger:  
 Good day. I’m Ledger, the analytical core of the Crew. I break down the numbers, calculate real value, assign Offer Scores out of 10, and deliver the final structured summary on every piece of mail. If there’s math, fine print, or fine print hiding in the math — I’ve got it.
 
-Shade:
+Shade:  
 And I’m Shade. I’m here to call out the nonsense. The predatory APR tricks, the “as low as” bait-and-switch garbage, the way they bury the gotchas in 8-point font. If a lender is trying to screw you politely, I’ll be the one laughing while I point it out.
 
-Spark:
+Spark:  
 YO! What’s up, mail victims?! I’m Spark — your friendly neighborhood chaos bot! I turn boring offers into comedy roasts. Balance transfer? More like “balance disaster” if you miss the fine print! Let’s make this fun before Ledger kills the vibe with spreadsheets.
 
-Clara:
+Clara:  
 Hi everyone, I’m Clara. I’m here to explain everything in plain, friendly English. Whether it’s intro rates, balance transfer fees, HELOCs, or what “pre-approved” actually means, I’ve got your back. No judgment, just clear explanations so you can make smart choices.
 
-Ledger:
+Ledger:  
 Together we form the OfferCrew. Our mission is simple: take the confusing, expensive world of consumer lending direct mail and make it entertaining, educational, and actually useful.
 
 Shade:
@@ -52,9 +52,9 @@ Ledger:
 So go ahead — dig out that stack of offers that’s been sitting on your counter. Scan them. Upload them. Let us roast them.
 We’re ready when you are.
 
-The Crew
-See you in the chat.
 
+The Crew:  
+See you in the chat.`
   }
   // Add more blog posts here later
 ];
