@@ -57,12 +57,14 @@ export default function Dashboard() {
       const offerId = `${user.id}-${timestamp}`;
       const uploadedPaths: string[] = [];
 
+      // Upload all images as one grouped Offer
       for (const file of selectedFiles) {
         const filePath = `${user.id}/offers/${offerId}/${file.name}`;
         await supabase.storage.from('mail-pieces').upload(filePath, file);
         uploadedPaths.push(filePath);
       }
 
+      // Analyze with Grok
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
@@ -71,12 +73,26 @@ export default function Dashboard() {
 
       let detectedLender = 'Unknown Lender';
       if (result.crewResponse) {
-        const firstLines = result.crewResponse.toLowerCase();
-        if (firstLines.includes('capital one')) detectedLender = 'Capital One';
-        else if (firstLines.includes('discover')) detectedLender = 'Discover';
-        else if (firstLines.includes('figure')) detectedLender = 'Figure';
-        else if (firstLines.includes('chase')) detectedLender = 'Chase';
+        const text = result.crewResponse.toLowerCase();
+        if (text.includes('capital one')) detectedLender = 'Capital One';
+        else if (text.includes('discover')) detectedLender = 'Discover';
+        else if (text.includes('figure')) detectedLender = 'Figure';
+        else if (text.includes('chase')) detectedLender = 'Chase';
+        else if (text.includes('american express')) detectedLender = 'American Express';
+        else if (text.includes('citi')) detectedLender = 'Citi';
+      }
 
+      // Save ONE offer record
+      const { data: newOffer } = await supabase.from('offers').insert({
+        user_id: user.id,
+        offer_id: offerId,
+        lender: detectedLender,
+        file_paths: uploadedPaths,
+        file_count: selectedFiles.length,
+        sequence_number: timestamp
+      }).select().single();
+
+      if (result.crewResponse) {
         const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
         const crewMessages = lines.map((line: string) => {
           const cleanLine = line.trim();
@@ -90,15 +106,6 @@ export default function Dashboard() {
         });
         setChatMessages(crewMessages);
       }
-
-      const { data: newOffer } = await supabase.from('offers').insert({
-        user_id: user.id,
-        offer_id: offerId,
-        lender: detectedLender,
-        file_paths: uploadedPaths,
-        file_count: selectedFiles.length,
-        sequence_number: timestamp
-      }).select().single();
 
       if (newOffer) setLatestOffer(newOffer);
       await loadHistory(user.id);
@@ -133,7 +140,6 @@ export default function Dashboard() {
         body: JSON.stringify({ 
           question,
           latestOfferId: latestOffer?.id,
-          // Pass file paths so the backend can re-download images for context
           filePaths: latestOffer?.file_paths 
         })
       });
@@ -169,7 +175,6 @@ export default function Dashboard() {
     try {
       if (offer.file_paths && offer.file_paths.length > 0) {
         const formData = new FormData();
-        // Download first image for re-analysis
         const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_paths[0]);
         if (fileData) {
           const file = new File([fileData], 'offer.jpg', { type: 'image/jpeg' });
@@ -218,7 +223,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation and Tab Bar (same as before) */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -245,7 +249,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'dashboard' && (
           <div className="flex gap-8 h-[calc(100vh-180px)]">
-            {/* Upload Section */}
+            {/* LEFT: Upload */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
@@ -261,21 +265,28 @@ export default function Dashboard() {
               </div>
 
               <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
-              <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
+              <button 
+                onClick={() => document.getElementById('fileInput')?.click()}
+                className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800"
+              >
                 📤 Select Photos (max 4)
               </button>
 
               {selectedFiles.length > 0 && (
                 <div className="mt-6">
                   <p className="font-medium mb-4">{selectedFiles.length} photo(s) selected</p>
-                  <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
+                  <button 
+                    onClick={analyzeWithCrew} 
+                    disabled={uploading}
+                    className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
+                  >
                     {uploading ? 'Analyzing...' : 'Send Offer to the Crew →'}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Chat Section */}
+            {/* CENTER: Chat */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
                 <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -321,7 +332,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Previous Offers */}
+            {/* RIGHT: Previous Offers */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
               <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
@@ -329,14 +340,18 @@ export default function Dashboard() {
                   <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
                 )}
                 {history.map((offer) => (
-                  <div key={offer.id} onClick={() => loadPastOffer(offer)} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]">
+                  <div 
+                    key={offer.id} 
+                    onClick={() => loadPastOffer(offer)} 
+                    className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
+                  >
                     <div>
                       <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
                       <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
                       <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} image(s)</p>
                     </div>
                     <p className="text-xs text-gray-400 mt-3">
-                      {new Date(offer.created_at).toLocaleDateString()}
+                      {new Date(offer.created_at).toLocaleDateString()} • {new Date(offer.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 ))}
