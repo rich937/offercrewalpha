@@ -269,15 +269,18 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Chat with Logo */}
+        {/* CENTER: Chat with Clean Logo Header */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Chat</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
             <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
-              {/* Updated Header with Logo */}
-              <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-5 flex items-center gap-3 text-white">
-                <img src="/logo.png" alt="OfferCrew" className="h-8" />
-                <h3 className="font-semibold text-lg">OfferCrew</h3>
+              {/* Clean Dark Blue Header - Logo Only */}
+              <div className="bg-gradient-to-r from-blue-800 to-blue-950 p-5 flex items-center justify-center text-white">
+                <img 
+                  src="/logo.png" 
+                  alt="OfferCrew" 
+                  className="h-9 brightness-0 invert" 
+                />
               </div>
 
               <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
