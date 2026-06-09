@@ -52,7 +52,7 @@ export default function Dashboard() {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
-    setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
+    setChatMessages(prev => [...prev, { type: 'system', text: `Analyzing ${selectedFiles.length} piece(s)...` }]);
 
     try {
       for (const file of selectedFiles) {
@@ -93,32 +93,34 @@ export default function Dashboard() {
       await loadHistory(user.id);
     } catch (err) {
       console.error(err);
-      setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
+      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I had trouble analyzing that piece." }]);
     }
 
     setSelectedFiles([]);
     setUploading(false);
   };
 
-  const sendUserMessage = async () => {
-    if (!userInput.trim()) return;
+  const sendUserMessage = () => {
+    if (!userInput.trim() || !user) return;
 
-    setChatMessages(prev => [...prev, { type: 'user', text: userInput }]);
+    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
+
+    setChatMessages(prev => [...prev, { 
+      type: 'user', 
+      text: userInput,
+      username: username 
+    }]);
+
     const question = userInput;
     setUserInput('');
 
-    // For now, send to Grok for a response from the Crew
-    try {
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question })
-      });
-      // In a future version we can make a dedicated chat endpoint
-      setChatMessages(prev => [...prev, { type: 'system', text: "The Crew is thinking about your question..." }]);
-    } catch (e) {
-      setChatMessages(prev => [...prev, { type: 'system', text: "Sorry, I couldn't respond to that right now." }]);
-    }
+    // TODO: Send to a chat endpoint later for contextual response
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, { 
+        type: 'system', 
+        text: "The Crew is thinking about your question..." 
+      }]);
+    }, 600);
   };
 
   const loadPastOffer = async (offer: any) => {
@@ -164,6 +166,12 @@ export default function Dashboard() {
     return '/icons/Ledger Icon.png';
   };
 
+  const getUserInitial = () => {
+    if (!user) return '?';
+    const name = user.user_metadata?.username || user.email || 'User';
+    return name.charAt(0).toUpperCase();
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
@@ -198,7 +206,7 @@ export default function Dashboard() {
               <li>Any personal account numbers</li>
             </ul>
             <p className="mt-4 text-amber-700 text-xs">
-              <strong>Leave visible:</strong> Offer rates, terms, fine print, company name, and especially the <strong>QR code</strong> — so you can easily respond to the offer later if you want.
+              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong> — so you can respond later if you want.
             </p>
           </div>
 
@@ -221,30 +229,40 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Fixed Size Chat */}
+        {/* CENTER: Fixed Size Text Interface */}
         <div className="flex-1 flex flex-col min-w-0">
-          <h2 className="text-xl font-semibold mb-4">Crew Reactions</h2>
+          <h2 className="text-xl font-semibold mb-4">Crew Chat</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
             <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
               <div className="bg-gradient-to-r from-cyan-500 to-purple-600 p-5 text-white">
                 <h3 className="font-semibold text-lg">OfferCrew</h3>
               </div>
 
-              {/* Fixed height scrollable chat */}
+              {/* Fixed height chat area */}
               <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
                     {msg.type !== 'system' && (
-                      <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
+                      <img 
+                        src={msg.type === 'user' ? '' : getIconPath(msg.type)} 
+                        alt={msg.type}
+                        className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
+                      />
                     )}
-                    <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : 'bg-white shadow-sm'}`}>
+                    {msg.type === 'user' && (
+                      <div className="w-11 h-11 flex-shrink-0 rounded-2xl bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mt-1">
+                        {getUserInitial()}
+                      </div>
+                    )}
+                    <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : msg.type === 'user' ? 'bg-blue-50' : 'bg-white shadow-sm'}`}>
+                      {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1 font-medium">{msg.username}</div>}
                       {msg.text}
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Persistent Chat Input Bar */}
+              {/* Persistent Input Bar */}
               <div className="border-t p-4 bg-white">
                 <div className="flex gap-3">
                   <input
@@ -257,7 +275,7 @@ export default function Dashboard() {
                   />
                   <button
                     onClick={sendUserMessage}
-                    className="px-6 bg-black text-white rounded-2xl font-medium hover:bg-gray-800"
+                    className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800"
                   >
                     Send
                   </button>
