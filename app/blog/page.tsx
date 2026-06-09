@@ -55,7 +55,86 @@ We’re ready when you are.
 
 The Crew:  
 See you in the chat.`
-  }
+  },
+
+    {
+    id: 2,
+    number: "Blog 2",
+    title: "How Much Debt Is Too Much Debt",
+    date: "June 9, 2026",
+    content: `The OfferCrew has entered the chat.
+
+    Clara:
+Hi everyone! Today we’re tackling one of the biggest questions people have: How much debt is too much? Debt isn’t automatically bad — it can help you buy a home, get an education, or grow a business. But it can also become a heavy burden very quickly.
+
+Spark:
+Yeah, like that time you bought a $1,200 grill on a credit card because “it was on sale” and now you’re eating ramen while staring at it in the garage! Classic.
+
+Shade:
+Or when the bank sends you another “pre-approved” card right after you finally paid one off. They’re not your friends.
+
+Ledger:
+Let’s bring some structure to this. The most important number financial experts watch is your Debt-to-Income Ratio, or DTI.
+
+Clara:
+Your DTI is your total monthly debt payments divided by your gross monthly income. For example, if you make $6,000 a month and your total debt payments are $2,500, your DTI is about 42%.
+
+
+Ledger:
+Here are the benchmarks:
+
+Under 36% — Healthy and comfortable.
+37–49% — Manageable but you should be careful.
+50% or higher — Danger zone. Most of your money is going to debt instead of living.
+
+Shade:
+Fifty percent? At that point you’re basically working for the banks. Congrats, you’re their favorite employee.
+
+Spark:
+It’s like the bank moved into your house and you’re paying rent… except they also own your soul!
+
+Clara:
+Another important metric is the difference between “good debt” and “bad debt.” A mortgage at 6% that builds equity can be smart. Credit card debt at 24% that you roll over every month? That’s toxic.
+
+Ledger:
+Context matters a lot. A $300,000 mortgage on a stable $120,000 income is often sustainable. $15,000 in credit card debt on the same income can spiral fast because of the high interest.
+
+Shade:
+Especially when you’re only paying the minimum and the balance barely moves. That’s how they get you.
+
+Spark:
+Minimum payments are just the bank’s way of saying “thanks for the interest, sucker!”
+
+Clara:
+Red flags that your debt has become too much include:
+
+Using credit cards for groceries and gas
+Feeling constant anxiety when opening mail
+No emergency savings
+Your credit score dropping significantly
+
+Ledger:
+If your debt is controlling your life instead of serving your goals, it has become too much.
+
+Final Summary from Ledger:
+Offer Score: 8/10 for awareness
+Debt becomes dangerous when it exceeds 36–40% DTI or when high-interest consumer debt starts growing faster than you can pay it. The goal isn’t zero debt — it’s strategic debt that improves your life while keeping you in control.
+
+Clara:
+Review your numbers regularly. Small changes — like paying an extra $200 a month — can make a huge difference over time.
+
+Shade:
+And stop opening new credit cards just because they send you a nice letter.
+
+Spark:
+Unless it comes with a free pizza. Then maybe.
+
+Ledger:
+We’re here whenever you want us to roast your specific debt situation. Just upload the statements.
+
+The Crew
+Stay smart out there.`
+    }
   // Add more blog posts here later
 ];
 
