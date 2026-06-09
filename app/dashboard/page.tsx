@@ -114,13 +114,13 @@ export default function Dashboard() {
     const question = userInput;
     setUserInput('');
 
-    // TODO: Send to a chat endpoint later for contextual response
+    // Simulate Crew response (we can improve this later with a dedicated chat endpoint)
     setTimeout(() => {
       setChatMessages(prev => [...prev, { 
-        type: 'system', 
-        text: "The Crew is thinking about your question..." 
+        type: 'clara', 
+        text: `Thanks for your question, ${username}. Let me think about that...` 
       }]);
-    }, 600);
+    }, 800);
   };
 
   const loadPastOffer = async (offer: any) => {
@@ -206,7 +206,7 @@ export default function Dashboard() {
               <li>Any personal account numbers</li>
             </ul>
             <p className="mt-4 text-amber-700 text-xs">
-              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong> — so you can respond later if you want.
+              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong> — so you can easily respond to the offer later if you want.
             </p>
           </div>
 
@@ -242,17 +242,12 @@ export default function Dashboard() {
               <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
-                    {msg.type !== 'system' && (
-                      <img 
-                        src={msg.type === 'user' ? '' : getIconPath(msg.type)} 
-                        alt={msg.type}
-                        className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1"
-                      />
-                    )}
-                    {msg.type === 'user' && (
+                    {msg.type === 'user' ? (
                       <div className="w-11 h-11 flex-shrink-0 rounded-2xl bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mt-1">
                         {getUserInitial()}
                       </div>
+                    ) : msg.type !== 'system' && (
+                      <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
                     )}
                     <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : msg.type === 'user' ? 'bg-blue-50' : 'bg-white shadow-sm'}`}>
                       {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1 font-medium">{msg.username}</div>}
