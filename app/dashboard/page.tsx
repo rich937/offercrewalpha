@@ -13,6 +13,7 @@ export default function Dashboard() {
   ]);
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
+  const [isResponding, setIsResponding] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -100,8 +101,8 @@ export default function Dashboard() {
     setUploading(false);
   };
 
-  const sendUserMessage = () => {
-    if (!userInput.trim() || !user) return;
+  const sendUserMessage = async () => {
+    if (!userInput.trim() || !user || isResponding) return;
 
     const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
 
@@ -113,13 +114,38 @@ export default function Dashboard() {
 
     const question = userInput;
     setUserInput('');
+    setIsResponding(true);
 
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, { 
-        type: 'clara', 
-        text: `Thanks for your question, ${username}. Let me check that for you...` 
-      }]);
-    }, 700);
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+
+      const result = await res.json();
+
+      if (result.crewResponse) {
+        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
+        const crewMessages = lines.map((line: string) => {
+          const cleanLine = line.trim();
+          let type = 'spark';
+          const lower = cleanLine.toLowerCase();
+          if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
+          else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
+          else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
+          else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
+
+          return { type, text: cleanLine };
+        });
+        setChatMessages(prev => [...prev, ...crewMessages]);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now. Can you try again?" }]);
+    }
+
+    setIsResponding(false);
   };
 
   const loadPastOffer = async (offer: any) => {
@@ -205,7 +231,7 @@ export default function Dashboard() {
               <li>Any personal account numbers</li>
             </ul>
             <p className="mt-4 text-amber-700 text-xs">
-              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong> — so you can easily respond later if you want.
+              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong> — so you can easily respond to the offer later if you want.
             </p>
           </div>
 
@@ -228,7 +254,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* CENTER: Fixed Chat Interface */}
+        {/* CENTER: Fixed Size Chat Interface */}
         <div className="flex-1 flex flex-col min-w-0">
           <h2 className="text-xl font-semibold mb-4">Crew Chat</h2>
           <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
@@ -237,7 +263,6 @@ export default function Dashboard() {
                 <h3 className="font-semibold text-lg">OfferCrew</h3>
               </div>
 
-              {/* Fixed size chat area */}
               <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
@@ -250,6 +275,7 @@ export default function Dashboard() {
                     )}
                     <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : msg.type === 'user' ? 'bg-blue-50' : 'bg-white shadow-sm'}`}>
                       {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1 font-medium">{msg.username}</div>}
+                      {msg.type !== 'user' && <div className="text-xs text-cyan-600 mb-1 font-medium capitalize">{msg.type}</div>}
                       {msg.text}
                     </div>
                   </div>
@@ -269,7 +295,8 @@ export default function Dashboard() {
                   />
                   <button
                     onClick={sendUserMessage}
-                    className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800"
+                    disabled={isResponding}
+                    className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
                   >
                     Send
                   </button>
