@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import Link from 'next/link';
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'blog'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'blog' | 'about'>('dashboard');
 
   // Dashboard states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -215,7 +216,10 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-6">
             <span>Welcome, <strong>{user?.user_metadata?.username || user?.email}</strong></span>
-            <button onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')} className="text-gray-500 hover:text-black">
+            <button 
+              onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')} 
+              className="text-gray-500 hover:text-black"
+            >
               Sign Out
             </button>
           </div>
@@ -224,7 +228,7 @@ export default function Dashboard() {
 
       {/* Tab Bar */}
       <div className="max-w-7xl mx-auto px-6 pt-6 border-b bg-white">
-        <div className="flex gap-8 text-lg font-medium">
+        <div className="flex gap-10 text-lg font-medium">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`pb-4 border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -236,6 +240,12 @@ export default function Dashboard() {
             className={`pb-4 border-b-2 transition-colors ${activeTab === 'blog' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           >
             Blog / Podcasts
+          </button>
+          <button
+            onClick={() => setActiveTab('about')}
+            className={`pb-4 border-b-2 transition-colors ${activeTab === 'about' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            About
           </button>
         </div>
       </div>
@@ -269,7 +279,11 @@ export default function Dashboard() {
               {selectedFiles.length > 0 && (
                 <div className="mt-6 text-center">
                   <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
-                  <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
+                  <button 
+                    onClick={analyzeWithCrew} 
+                    disabled={uploading} 
+                    className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
+                  >
                     {uploading ? 'Analyzing...' : 'Send to the Crew →'}
                   </button>
                 </div>
@@ -313,7 +327,11 @@ export default function Dashboard() {
                         placeholder="Ask the Crew a question..."
                         className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       />
-                      <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">
+                      <button 
+                        onClick={sendUserMessage} 
+                        disabled={isResponding} 
+                        className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
+                      >
                         Send
                       </button>
                     </div>
@@ -330,7 +348,11 @@ export default function Dashboard() {
                   <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
                 )}
                 {history.map((offer) => (
-                  <div key={offer.id} onClick={() => loadPastOffer(offer)} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]">
+                  <div 
+                    key={offer.id} 
+                    onClick={() => loadPastOffer(offer)} 
+                    className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
+                  >
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-semibold text-lg">{offer.lender || 'Mail Piece'}</p>
@@ -348,13 +370,21 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'blog' && (
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold mb-8">Blog & Podcasts</h2>
-            <div className="bg-white rounded-3xl p-12 text-center">
-              <p className="text-2xl text-gray-400 mb-6">Coming Soon</p>
-              <p className="text-lg text-gray-600 max-w-md mx-auto">
-                Exciting podcasts and blog posts featuring the OfferCrew will be available here.
-              </p>
+          <div className="max-w-4xl mx-auto text-center py-20">
+            <h2 className="text-4xl font-bold mb-6">Blog & Podcasts</h2>
+            <p className="text-xl text-gray-500">Coming soon — entertaining financial content from the OfferCrew!</p>
+          </div>
+        )}
+
+        {activeTab === 'about' && (
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold mb-8">About OfferCrew</h2>
+            <p className="text-lg mb-8">We turn boring financial junk mail into hilarious commentary from four AI robots: Ledger, Shade, Spark, and Clara.</p>
+            
+            <h3 className="text-2xl font-semibold mt-12 mb-6">Legal Documents</h3>
+            <div className="space-y-4 text-lg">
+              <Link href="/terms" className="block text-cyan-600 hover:underline">→ Terms of Service</Link>
+              <Link href="/privacy" className="block text-cyan-600 hover:underline">→ Privacy Policy</Link>
             </div>
           </div>
         )}
