@@ -5,15 +5,25 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
+    const question = formData.get('question') as string | null;
 
-    if (files.length === 0) {
-      return NextResponse.json({ error: "No files provided" }, { status: 400 });
+    let imageContent: any = null;
+
+    if (files.length > 0) {
+      const file = files[0];
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
+
+      imageContent = { 
+        type: "image_url", 
+        image_url: { url: `data:${mimeType};base64,${base64}` } 
+      };
     }
 
-    const file = files[0];
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-    const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
+    const userMessage = question 
+      ? `The user asked: "${question}". Respond in character as the Crew.` 
+      : "Analyze this financial mail piece. Start with the company name.";
 
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -26,19 +36,19 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew — four robots reacting to financial junk mail.
+            content: `You are OfferCrew — exactly four robots.
 
 ${REFERENCE_GUIDE}
 
-IMPORTANT: Do NOT include metadata labels like LENDER:, PRODUCT_TYPE:, etc. in your final response.
-Only use them internally for analysis. Respond naturally as the Crew.`
+MANDATORY:
+- Generate plenty of back-and-forth banter (twice as much as normal).
+- Always start by identifying the company.
+- Ledger must ALWAYS be the final speaker with a structured recap and Offer Score out of 10.
+- Never invent new characters.`
           },
           {
             role: "user",
-            content: [
-              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
-              { type: "text", text: "Analyze this mail piece as the full OfferCrew. Start with the company name." }
-            ]
+            content: imageContent ? [imageContent, { type: "text", text: userMessage }] : userMessage
           }
         ],
         temperature: 0.8,
@@ -47,7 +57,7 @@ Only use them internally for analysis. Respond naturally as the Crew.`
     });
 
     const grokData = await grokResponse.json();
-    const aiText = grokData.choices?.[0]?.message?.content || "The Crew analyzed it!";
+    const aiText = grokData.choices?.[0]?.message?.content || "The Crew is thinking...";
 
     return NextResponse.json({
       success: true,
@@ -56,6 +66,9 @@ Only use them internally for analysis. Respond naturally as the Crew.`
 
   } catch (error) {
     console.error("Analysis error:", error);
-    return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Analysis failed", 
+      message: error instanceof Error ? error.message : "Unknown error" 
+    }, { status: 500 });
   }
 }
