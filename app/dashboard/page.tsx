@@ -57,14 +57,12 @@ export default function Dashboard() {
       const offerId = `${user.id}-${timestamp}`;
       const uploadedPaths: string[] = [];
 
-      // Upload all images as one Offer
       for (const file of selectedFiles) {
         const filePath = `${user.id}/offers/${offerId}/${file.name}`;
         await supabase.storage.from('mail-pieces').upload(filePath, file);
         uploadedPaths.push(filePath);
       }
 
-      // Analyze with Grok (Lender will be extracted in /api/analyze)
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
@@ -72,15 +70,12 @@ export default function Dashboard() {
       const result = await res.json();
 
       let detectedLender = 'Unknown Lender';
-
       if (result.crewResponse) {
-        // Try to extract lender from first few lines
-        const firstLines = result.crewResponse.split('\n').slice(0, 6).join(' ').toLowerCase();
+        const firstLines = result.crewResponse.toLowerCase();
         if (firstLines.includes('capital one')) detectedLender = 'Capital One';
         else if (firstLines.includes('discover')) detectedLender = 'Discover';
         else if (firstLines.includes('figure')) detectedLender = 'Figure';
         else if (firstLines.includes('chase')) detectedLender = 'Chase';
-        // Add more common lenders as needed
 
         const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
         const crewMessages = lines.map((line: string) => {
@@ -96,7 +91,6 @@ export default function Dashboard() {
         setChatMessages(crewMessages);
       }
 
-      // Save as ONE Offer with detected lender
       const { data: newOffer } = await supabase.from('offers').insert({
         user_id: user.id,
         offer_id: offerId,
@@ -108,7 +102,6 @@ export default function Dashboard() {
 
       if (newOffer) setLatestOffer(newOffer);
       await loadHistory(user.id);
-
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that offer." }]);
@@ -118,10 +111,103 @@ export default function Dashboard() {
     setUploading(false);
   };
 
-  const sendUserMessage = async () => { /* unchanged */ };
-  const loadPastOffer = async (offer: any) => { /* unchanged */ };
-  const getIconPath = (type: string) => { /* unchanged */ };
-  const getUserInitial = () => { /* unchanged */ };
+  const sendUserMessage = async () => {
+    if (!userInput.trim() || !user || isResponding) return;
+
+    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
+
+    setChatMessages(prev => [...prev, { 
+      type: 'user', 
+      text: userInput,
+      username 
+    }]);
+
+    const question = userInput;
+    setUserInput('');
+    setIsResponding(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, latestOfferId: latestOffer?.id })
+      });
+
+      const result = await res.json();
+
+      if (result.crewResponse) {
+        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
+        const crewMessages = lines.map((line: string) => {
+          const cleanLine = line.trim();
+          let type = 'spark';
+          const lower = cleanLine.toLowerCase();
+          if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
+          else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
+          else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
+          else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
+          return { type, text: cleanLine };
+        });
+        setChatMessages(prev => [...prev, ...crewMessages]);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now." }]);
+    }
+
+    setIsResponding(false);
+  };
+
+  const loadPastOffer = async (offer: any) => {
+    setLatestOffer(offer);
+    setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.lender || 'offer'}...` }]);
+
+    try {
+      // For now we re-analyze the first image
+      if (offer.file_paths && offer.file_paths.length > 0) {
+        const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_paths[0]);
+        if (fileData) {
+          const file = new File([fileData], 'offer.jpg', { type: 'image/jpeg' });
+          const formData = new FormData();
+          formData.append('files', file);
+
+          const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+          const result = await res.json();
+
+          if (result.crewResponse) {
+            const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
+            const crewMessages = lines.map((line: string) => {
+              const cleanLine = line.trim();
+              let type = 'spark';
+              const lower = cleanLine.toLowerCase();
+              if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
+              else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
+              else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
+              else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
+              return { type, text: cleanLine };
+            });
+            setChatMessages(crewMessages);
+          }
+        }
+      }
+    } catch (e) {
+      setChatMessages([{ type: 'system', text: "Sorry, I had trouble re-analyzing that offer." }]);
+    }
+  };
+
+  const getIconPath = (type: string) => {
+    const t = type.toLowerCase();
+    if (t.includes('ledger')) return '/icons/Ledger Icon.png';
+    if (t.includes('spark')) return '/icons/Spark Icon.png';
+    if (t.includes('shade')) return '/icons/Shade Icon.png';
+    if (t.includes('clara')) return '/icons/Clara Icon.png';
+    return '/icons/Ledger Icon.png';
+  };
+
+  const getUserInitial = (): string => {
+    if (!user) return '?';
+    const name = user.user_metadata?.username || user.email || 'User';
+    return name.charAt(0).toUpperCase();
+  };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
@@ -142,7 +228,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Tab Bar */}
       <div className="max-w-7xl mx-auto px-6 pt-6 border-b bg-white">
         <div className="flex gap-10 text-lg font-medium">
           <button onClick={() => setActiveTab('dashboard')} className={`pb-4 border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Dashboard</button>
@@ -157,7 +242,6 @@ export default function Dashboard() {
             {/* LEFT: Upload */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
-              
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
                 <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
                 <p className="text-amber-700 mb-4">For your protection, please <strong>redact with a black Sharpie</strong>:</p>
@@ -192,7 +276,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* CENTER: Chat Interface */}
+            {/* CENTER: Chat */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
                 <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -251,12 +335,10 @@ export default function Dashboard() {
                     onClick={() => loadPastOffer(offer)} 
                     className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
-                        <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
-                        <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} image(s)</p>
-                      </div>
+                    <div>
+                      <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
+                      <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
+                      <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} image(s)</p>
                     </div>
                     <p className="text-xs text-gray-400 mt-3">
                       {new Date(offer.created_at).toLocaleDateString()}
