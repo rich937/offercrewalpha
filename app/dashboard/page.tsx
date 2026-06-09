@@ -6,6 +6,9 @@ import { supabase } from '../lib/supabase';
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'blog'>('dashboard');
+
+  // Dashboard states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([
@@ -219,139 +222,142 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-80px)]">
-        
-        {/* LEFT: Simple Upload */}
-        <div className="w-80 flex-shrink-0">
-          <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
-          
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
-            <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
-            <p className="text-amber-700 mb-4">
-              For your protection, please <strong>redact with a black Sharpie</strong>:
-            </p>
-            <ul className="list-disc pl-5 space-y-1 text-amber-700 text-xs">
-              <li>Your full name and street address</li>
-              <li>Any personal account numbers</li>
-            </ul>
-            <p className="mt-4 text-amber-700 text-xs">
-              <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong>.
-            </p>
-          </div>
-
-          <input 
-            id="fileInput" 
-            type="file" 
-            accept="image/*" 
-            multiple 
-            className="hidden" 
-            onChange={handleFileSelect} 
-          />
-          
-          <button 
-            onClick={() => document.getElementById('fileInput')?.click()}
-            className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800 flex items-center justify-center gap-3"
+      {/* Tab Bar */}
+      <div className="max-w-7xl mx-auto px-6 pt-6 border-b bg-white">
+        <div className="flex gap-8 text-lg font-medium">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`pb-4 border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           >
-            📤 Upload Mail Photos (max 4)
+            Dashboard
           </button>
-
-          {selectedFiles.length > 0 && (
-            <div className="mt-6 text-center">
-              <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
-              <button 
-                onClick={analyzeWithCrew} 
-                disabled={uploading} 
-                className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
-              >
-                {uploading ? 'Analyzing...' : 'Send to the Crew →'}
-              </button>
-            </div>
-          )}
+          <button
+            onClick={() => setActiveTab('blog')}
+            className={`pb-4 border-b-2 transition-colors ${activeTab === 'blog' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            Blog / Podcasts
+          </button>
         </div>
+      </div>
 
-        {/* CENTER: Chat */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <h2 className="text-xl font-semibold mb-4">Crew Chat</h2>
-          <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
-            <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
-              {/* Light Blue Header with Black Logo */}
-              <div className="bg-blue-100 p-5 flex items-center justify-center border-b">
-                <img 
-                  src="/logo.png" 
-                  alt="OfferCrew" 
-                  className="h-9" 
-                />
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {activeTab === 'dashboard' && (
+          <div className="flex gap-8 h-[calc(100vh-180px)]">
+            {/* LEFT: Upload */}
+            <div className="w-80 flex-shrink-0">
+              <h2 className="text-xl font-semibold mb-6">Upload Mail</h2>
+              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
+                <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
+                <p className="text-amber-700 mb-4">For your protection, please <strong>redact with a black Sharpie</strong>:</p>
+                <ul className="list-disc pl-5 space-y-1 text-amber-700 text-xs">
+                  <li>Your full name and street address</li>
+                  <li>Any personal account numbers</li>
+                </ul>
+                <p className="mt-4 text-amber-700 text-xs">
+                  <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong>.
+                </p>
               </div>
 
-              <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
-                {chatMessages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
-                    {msg.type === 'user' ? (
-                      <div className="w-11 h-11 flex-shrink-0 rounded-2xl bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mt-1">
-                        {getUserInitial()}
+              <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+              <button 
+                onClick={() => document.getElementById('fileInput')?.click()}
+                className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800 flex items-center justify-center gap-3"
+              >
+                📤 Upload Mail Photos (max 4)
+              </button>
+
+              {selectedFiles.length > 0 && (
+                <div className="mt-6 text-center">
+                  <p className="font-medium mb-3">{selectedFiles.length} file(s) selected</p>
+                  <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
+                    {uploading ? 'Analyzing...' : 'Send to the Crew →'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* CENTER: Chat */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
+                <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
+                  <div className="bg-blue-100 p-5 flex items-center justify-center border-b">
+                    <img src="/logo.png" alt="OfferCrew" className="h-9" />
+                  </div>
+
+                  <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
+                        {msg.type === 'user' ? (
+                          <div className="w-11 h-11 flex-shrink-0 rounded-2xl bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mt-1">
+                            {getUserInitial()}
+                          </div>
+                        ) : msg.type !== 'system' && (
+                          <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
+                        )}
+                        <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : msg.type === 'user' ? 'bg-blue-50' : 'bg-white shadow-sm'}`}>
+                          {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1 font-medium">{msg.username}</div>}
+                          {msg.type !== 'user' && msg.type !== 'system' && <div className="text-xs text-cyan-600 mb-1 font-medium capitalize">{msg.type}</div>}
+                          {msg.text}
+                        </div>
                       </div>
-                    ) : msg.type !== 'system' && (
-                      <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
-                    )}
-                    <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : msg.type === 'user' ? 'bg-blue-50' : 'bg-white shadow-sm'}`}>
-                      {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1 font-medium">{msg.username}</div>}
-                      {msg.type !== 'user' && msg.type !== 'system' && <div className="text-xs text-cyan-600 mb-1 font-medium capitalize">{msg.type}</div>}
-                      {msg.text}
+                    ))}
+                  </div>
+
+                  <div className="border-t p-4 bg-white">
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()}
+                        placeholder="Ask the Crew a question..."
+                        className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                      <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">
+                        Send
+                      </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: Previous Offers */}
+            <div className="w-80 flex-shrink-0">
+              <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
+              <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
+                {history.length === 0 && (
+                  <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
+                )}
+                {history.map((offer) => (
+                  <div key={offer.id} onClick={() => loadPastOffer(offer)} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold text-lg">{offer.lender || 'Mail Piece'}</p>
+                        <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">
+                      {new Date(offer.created_at).toLocaleDateString()}
+                    </p>
                   </div>
                 ))}
               </div>
-
-              <div className="border-t p-4 bg-white">
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()}
-                    placeholder="Ask the Crew a question..."
-                    className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  />
-                  <button
-                    onClick={sendUserMessage}
-                    disabled={isResponding}
-                    className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* RIGHT: Previous Offers */}
-        <div className="w-80 flex-shrink-0">
-          <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
-          <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
-            {history.length === 0 && (
-              <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
-            )}
-
-            {history.map((offer) => (
-              <div 
-                key={offer.id}
-                onClick={() => loadPastOffer(offer)}
-                className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-lg">{offer.lender || 'Mail Piece'}</p>
-                    <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 mt-3">
-                  {new Date(offer.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            ))}
+        {activeTab === 'blog' && (
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold mb-8">Blog & Podcasts</h2>
+            <div className="bg-white rounded-3xl p-12 text-center">
+              <p className="text-2xl text-gray-400 mb-6">Coming Soon</p>
+              <p className="text-lg text-gray-600 max-w-md mx-auto">
+                Exciting podcasts and blog posts featuring the OfferCrew will be available here.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
