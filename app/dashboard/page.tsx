@@ -50,7 +50,7 @@ export default function Dashboard() {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
-    setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} image(s)...` }]);
+    setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} file(s)...` }]);
 
     try {
       const timestamp = Date.now();
@@ -102,9 +102,7 @@ export default function Dashboard() {
         setChatMessages(crewMessages);
       }
 
-      if (newOffer) {
-        setLatestOffer(newOffer);   // Critical update
-      }
+      if (newOffer) setLatestOffer(newOffer);
       await loadHistory(user.id);
     } catch (err) {
       console.error(err);
@@ -131,7 +129,6 @@ export default function Dashboard() {
     setIsResponding(true);
 
     try {
-      // If we have a latestOffer, re-analyze it with the question
       if (latestOffer && latestOffer.file_paths && latestOffer.file_paths.length > 0) {
         const formData = new FormData();
         const { data: fileData } = await supabase.storage
@@ -139,13 +136,10 @@ export default function Dashboard() {
           .download(latestOffer.file_paths[0]);
 
         if (fileData) {
-          const file = new File([fileData], 'current-offer.jpg', { type: 'image/jpeg' });
+          const file = new File([fileData], 'current-offer.pdf', { type: 'application/pdf' });
           formData.append('files', file);
 
-          const res = await fetch('/api/analyze', { 
-            method: 'POST', 
-            body: formData 
-          });
+          const res = await fetch('/api/analyze', { method: 'POST', body: formData });
           const result = await res.json();
 
           if (result.crewResponse) {
@@ -161,14 +155,11 @@ export default function Dashboard() {
               return { type, text: cleanLine };
             });
             setChatMessages(prev => [...prev, ...crewMessages]);
-            setIsResponding(false);
-            return;
           }
         }
+      } else {
+        setChatMessages(prev => [...prev, { type: 'clara', text: "I don't have an offer loaded right now. Please upload one first." }]);
       }
-
-      // Fallback if no offer
-      setChatMessages(prev => [...prev, { type: 'clara', text: "I don't have an offer loaded right now. Please upload one first." }]);
     } catch (err) {
       console.error(err);
       setChatMessages(prev => [...prev, { type: 'clara', text: "Sorry, I'm having trouble responding right now." }]);
@@ -176,8 +167,6 @@ export default function Dashboard() {
 
     setIsResponding(false);
   };
-
-  // ... rest of the file (loadPastOffer, getIconPath, getUserInitial) remains the same
 
   const loadPastOffer = async (offer: any) => {
     setLatestOffer(offer);
@@ -188,7 +177,7 @@ export default function Dashboard() {
         const formData = new FormData();
         const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_paths[0]);
         if (fileData) {
-          const file = new File([fileData], 'offer.jpg', { type: 'image/jpeg' });
+          const file = new File([fileData], 'offer.pdf', { type: 'application/pdf' });
           formData.append('files', file);
 
           const res = await fetch('/api/analyze', { method: 'POST', body: formData });
@@ -234,7 +223,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation and Tab Bar (same as before) */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -276,17 +264,24 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+              <input 
+                id="fileInput" 
+                type="file" 
+                accept="image/*,application/pdf" 
+                multiple 
+                className="hidden" 
+                onChange={handleFileSelect} 
+              />
               <button 
                 onClick={() => document.getElementById('fileInput')?.click()}
                 className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800"
               >
-                📤 Select Photos (max 4)
+                📤 Select Photos or PDF (max 4)
               </button>
 
               {selectedFiles.length > 0 && (
                 <div className="mt-6">
-                  <p className="font-medium mb-4">{selectedFiles.length} photo(s) selected</p>
+                  <p className="font-medium mb-4">{selectedFiles.length} file(s) selected</p>
                   <button 
                     onClick={analyzeWithCrew} 
                     disabled={uploading}
@@ -360,7 +355,7 @@ export default function Dashboard() {
                     <div>
                       <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
                       <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
-                      <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} image(s)</p>
+                      <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
                     </div>
                     <p className="text-xs text-gray-400 mt-3">
                       {new Date(offer.created_at).toLocaleDateString()} • {new Date(offer.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
