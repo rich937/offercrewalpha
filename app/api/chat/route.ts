@@ -6,9 +6,14 @@ export async function POST(request: NextRequest) {
   try {
     const { question, latestOfferId, filePaths } = await request.json();
 
+    console.log("=== NEW CHAT REQUEST ===");
+    console.log("Question:", question);
+    console.log("Latest Offer ID:", latestOfferId);
+    console.log("File Paths count:", filePaths?.length || 0);
+
     let imageContents: any[] = [];
 
-    // Reload the most recent offer's images
+    // FORCE reload the latest offer images
     if (filePaths && filePaths.length > 0) {
       for (const path of filePaths.slice(0, 4)) {
         const { data: fileData } = await supabase.storage
@@ -25,8 +30,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const userPrompt = `The user asked: "${question}". 
-Please re-analyze the current offer shown in the images and answer based ONLY on this offer.`;
+    const userPrompt = `This is the CURRENT offer the user just uploaded.
+User question: "${question}"
+
+Answer based ONLY on this offer.`;
 
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -39,14 +46,14 @@ Please re-analyze the current offer shown in the images and answer based ONLY on
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew — exactly four robots.
+            content: `You are OfferCrew. You are looking at the MOST RECENT offer only.
 
 ${REFERENCE_GUIDE}
 
-MANDATORY:
-- Always start by acknowledging the question: "The question is about..."
-- Then re-analyze the images provided.
-- Base your entire answer on the current images only. Do not mix up previous offers.`
+STRICT RULES:
+- Base EVERYTHING on the images in this message.
+- Do NOT reference any previous offers.
+- Start your response with "The question is about..."`
           },
           {
             role: "user",
@@ -55,7 +62,7 @@ MANDATORY:
               : userPrompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.65,
         max_tokens: 1100,
       }),
     });
