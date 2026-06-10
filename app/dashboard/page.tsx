@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 import * as pdfjsLib from 'pdfjs-dist';
-import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist/types/src/display/api';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs`;
 
@@ -80,13 +79,17 @@ export default function Dashboard() {
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: 1.5 });
+
         const canvas = document.createElement('canvas');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
+        const ctx = canvas.getContext('2d', { alpha: false })!;
+
         const renderContext = {
-          canvasContext: canvas.getContext('2d')!,
-          viewport: viewport
+          canvasContext: ctx,
+          viewport: viewport,
+          canvas: canvas
         };
 
         await page.render(renderContext).promise;
@@ -317,6 +320,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'dashboard' && (
           <div className="flex gap-8 h-[calc(100vh-180px)]">
+            {/* LEFT: Upload */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
@@ -340,6 +344,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* CENTER: Chat */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
                 <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -366,7 +371,14 @@ export default function Dashboard() {
                   </div>
                   <div className="border-t p-4 bg-white">
                     <div className="flex gap-3">
-                      <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()} placeholder="Ask the Crew a question..." className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                      <input
+                        type="text"
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()}
+                        placeholder="Ask the Crew a question..."
+                        className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
                       <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">Send</button>
                     </div>
                   </div>
@@ -374,6 +386,7 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* RIGHT: Previous Offers */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
               <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
