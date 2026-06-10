@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isResponding, setIsResponding] = useState(false);
-  const [latestOffer, setLatestOffer] = useState<any>(null);
+  const [latestOffer, setLatestOffer] = useState<any>(null);   // ← This must stay updated
 
   useEffect(() => {
     const init = async () => {
@@ -36,7 +36,9 @@ export default function Dashboard() {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     setHistory(data || []);
-    if (data && data.length > 0) setLatestOffer(data[0]);
+    if (data && data.length > 0) {
+      setLatestOffer(data[0]);   // Always keep the newest offer
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,8 +78,6 @@ export default function Dashboard() {
         else if (text.includes('discover')) detectedLender = 'Discover';
         else if (text.includes('figure')) detectedLender = 'Figure';
         else if (text.includes('chase')) detectedLender = 'Chase';
-        else if (text.includes('american express')) detectedLender = 'American Express';
-        else if (text.includes('citi')) detectedLender = 'Citi';
       }
 
       const { data: newOffer } = await supabase.from('offers').insert({
@@ -104,7 +104,9 @@ export default function Dashboard() {
         setChatMessages(crewMessages);
       }
 
-      if (newOffer) setLatestOffer(newOffer);
+      if (newOffer) {
+        setLatestOffer(newOffer);   // ← Critical: always update latestOffer
+      }
       await loadHistory(user.id);
     } catch (err) {
       console.error(err);
@@ -137,7 +139,7 @@ export default function Dashboard() {
         body: JSON.stringify({ 
           question,
           latestOfferId: latestOffer?.id,
-          filePaths: latestOffer?.file_paths 
+          filePaths: latestOffer?.file_paths   // Must send latest images
         })
       });
 
@@ -164,6 +166,8 @@ export default function Dashboard() {
 
     setIsResponding(false);
   };
+
+  // ... (rest of the file - loadPastOffer, getIconPath, getUserInitial remain the same)
 
   const loadPastOffer = async (offer: any) => {
     setLatestOffer(offer);
@@ -220,6 +224,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation and Tab Bar */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
