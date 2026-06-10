@@ -57,14 +57,12 @@ export default function Dashboard() {
       const offerId = `${user.id}-${timestamp}`;
       const uploadedPaths: string[] = [];
 
-      // Upload all images as one grouped Offer
       for (const file of selectedFiles) {
         const filePath = `${user.id}/offers/${offerId}/${file.name}`;
         await supabase.storage.from('mail-pieces').upload(filePath, file);
         uploadedPaths.push(filePath);
       }
 
-      // Analyze with Grok
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
@@ -82,7 +80,6 @@ export default function Dashboard() {
         else if (text.includes('citi')) detectedLender = 'Citi';
       }
 
-      // Save ONE offer record
       const { data: newOffer } = await supabase.from('offers').insert({
         user_id: user.id,
         offer_id: offerId,
@@ -162,7 +159,7 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error(err);
-      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now. Can you try again?" }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now." }]);
     }
 
     setIsResponding(false);
