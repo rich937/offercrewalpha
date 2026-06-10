@@ -41,7 +41,14 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).slice(0, 4);
+      let files = Array.from(e.target.files).slice(0, 4);
+      
+      // Warn about large files (common with phone scans)
+      const largeFiles = files.filter(f => f.size > 8 * 1024 * 1024);
+      if (largeFiles.length > 0) {
+        alert("Some files are large (common with phone scans). We'll try to process them, but smaller photos work best.");
+      }
+      
       setSelectedFiles(files);
     }
   };
@@ -76,6 +83,8 @@ export default function Dashboard() {
         else if (text.includes('discover')) detectedLender = 'Discover';
         else if (text.includes('figure')) detectedLender = 'Figure';
         else if (text.includes('chase')) detectedLender = 'Chase';
+        else if (text.includes('american express')) detectedLender = 'American Express';
+        else if (text.includes('citi')) detectedLender = 'Citi';
       }
 
       const { data: newOffer } = await supabase.from('offers').insert({
@@ -261,6 +270,9 @@ export default function Dashboard() {
                 </ul>
                 <p className="mt-4 text-amber-700 text-xs">
                   <strong>Leave visible:</strong> Offer rates, terms, company name, and especially the <strong>QR code</strong>.
+                </p>
+                <p className="mt-4 text-red-600 text-xs font-medium">
+                  ⚠️ Phone photos can be large. We will process them, but smaller files work best.
                 </p>
               </div>
 
