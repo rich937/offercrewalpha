@@ -4,19 +4,20 @@ import { supabase } from '../../lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { question, latestOfferId, filePaths } = await request.json();
+    const body = await request.json();
+    const { question, latestOfferId, filePaths } = body;
 
-    console.log("=== NEW CHAT REQUEST ===");
+    console.log("=== CHAT REQUEST RECEIVED ===");
     console.log("Question:", question);
     console.log("Latest Offer ID:", latestOfferId);
-    console.log("File Paths count:", filePaths?.length || 0);
+    console.log("File Paths received:", filePaths);
 
     let imageContents: any[] = [];
 
-    // FORCE reload the latest offer images
     if (filePaths && filePaths.length > 0) {
+      console.log(`Attempting to load ${filePaths.length} images...`);
       for (const path of filePaths.slice(0, 4)) {
-        const { data: fileData } = await supabase.storage
+        const { data: fileData, error } = await supabase.storage
           .from('mail-pieces')
           .download(path);
 
@@ -26,14 +27,16 @@ export async function POST(request: NextRequest) {
             type: "image_url",
             image_url: { url: `data:image/jpeg;base64,${base64}` }
           });
+          console.log("✓ Successfully loaded image:", path);
+        } else {
+          console.log("✗ Failed to load image:", path, error);
         }
       }
+    } else {
+      console.log("⚠ No filePaths provided!");
     }
 
-    const userPrompt = `This is the CURRENT offer the user just uploaded.
-User question: "${question}"
-
-Answer based ONLY on this offer.`;
+    console.log(`Sending ${imageContents.length} images to Grok`);
 
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -46,24 +49,21 @@ Answer based ONLY on this offer.`;
         messages: [
           {
             role: "system",
-            content: `You are OfferCrew. You are looking at the MOST RECENT offer only.
+            content: `You are ONLY looking at the CURRENT offer in the images provided. Ignore all previous context.
 
 ${REFERENCE_GUIDE}
 
-STRICT RULES:
-- Base EVERYTHING on the images in this message.
-- Do NOT reference any previous offers.
-- Start your response with "The question is about..."`
+MANDATORY: Start with "The question is about..." and base everything on the current images only.`
           },
           {
             role: "user",
             content: imageContents.length > 0 
-              ? [...imageContents, { type: "text", text: userPrompt }]
-              : userPrompt
+              ? [...imageContents, { type: "text", text: `Question: ${question}` }]
+              : `Question: ${question}`
           }
         ],
-        temperature: 0.65,
-        max_tokens: 1100,
+        temperature: 0.6,
+        max_tokens: 1000,
       }),
     });
 
