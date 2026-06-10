@@ -8,9 +8,8 @@ export async function POST(request: NextRequest) {
 
     let imageContents: any[] = [];
 
-    // Force using the latest offer's images
+    // Reload the most recent offer's images
     if (filePaths && filePaths.length > 0) {
-      console.log(`Using ${filePaths.length} images from latest offer`);
       for (const path of filePaths.slice(0, 4)) {
         const { data: fileData } = await supabase.storage
           .from('mail-pieces')
@@ -24,9 +23,10 @@ export async function POST(request: NextRequest) {
           });
         }
       }
-    } else {
-      console.log("Warning: No filePaths provided for chat");
     }
+
+    const userPrompt = `The user asked: "${question}". 
+Please re-analyze the current offer shown in the images and answer based ONLY on this offer.`;
 
     const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -44,20 +44,19 @@ export async function POST(request: NextRequest) {
 ${REFERENCE_GUIDE}
 
 MANDATORY:
-- ALWAYS base your answer on the images provided in this message.
-- This is about the MOST RECENT offer the user uploaded.
-- Start by identifying the lender if possible.
-- Stay in character and be helpful.`
+- Always start by acknowledging the question: "The question is about..."
+- Then re-analyze the images provided.
+- Base your entire answer on the current images only. Do not mix up previous offers.`
           },
           {
             role: "user",
             content: imageContents.length > 0 
-              ? [...imageContents, { type: "text", text: `User question: "${question}"` }]
-              : `User question: "${question}"`
+              ? [...imageContents, { type: "text", text: userPrompt }]
+              : userPrompt
           }
         ],
-        temperature: 0.75,
-        max_tokens: 1000,
+        temperature: 0.7,
+        max_tokens: 1100,
       }),
     });
 
@@ -68,6 +67,6 @@ MANDATORY:
 
   } catch (error) {
     console.error("Chat error:", error);
-    return NextResponse.json({ error: "Failed to respond" }, { status: 500 });
+    return NextResponse.json({ crewResponse: "Sorry, I'm having trouble responding right now." });
   }
 }
