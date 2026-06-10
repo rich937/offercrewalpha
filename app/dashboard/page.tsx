@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isResponding, setIsResponding] = useState(false);
-  const [latestOffer, setLatestOffer] = useState<any>(null);   // ← This must stay updated
+  const [latestOffer, setLatestOffer] = useState<any>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -36,9 +36,7 @@ export default function Dashboard() {
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     setHistory(data || []);
-    if (data && data.length > 0) {
-      setLatestOffer(data[0]);   // Always keep the newest offer
-    }
+    if (data && data.length > 0) setLatestOffer(data[0]);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +103,7 @@ export default function Dashboard() {
       }
 
       if (newOffer) {
-        setLatestOffer(newOffer);   // ← Critical: always update latestOffer
+        setLatestOffer(newOffer);   // Critical update
       }
       await loadHistory(user.id);
     } catch (err) {
@@ -133,41 +131,53 @@ export default function Dashboard() {
     setIsResponding(true);
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          question,
-          latestOfferId: latestOffer?.id,
-          filePaths: latestOffer?.file_paths   // Must send latest images
-        })
-      });
+      // If we have a latestOffer, re-analyze it with the question
+      if (latestOffer && latestOffer.file_paths && latestOffer.file_paths.length > 0) {
+        const formData = new FormData();
+        const { data: fileData } = await supabase.storage
+          .from('mail-pieces')
+          .download(latestOffer.file_paths[0]);
 
-      const result = await res.json();
+        if (fileData) {
+          const file = new File([fileData], 'current-offer.jpg', { type: 'image/jpeg' });
+          formData.append('files', file);
 
-      if (result.crewResponse) {
-        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
-        const crewMessages = lines.map((line: string) => {
-          const cleanLine = line.trim();
-          let type = 'spark';
-          const lower = cleanLine.toLowerCase();
-          if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
-          else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
-          else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
-          else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
-          return { type, text: cleanLine };
-        });
-        setChatMessages(prev => [...prev, ...crewMessages]);
+          const res = await fetch('/api/analyze', { 
+            method: 'POST', 
+            body: formData 
+          });
+          const result = await res.json();
+
+          if (result.crewResponse) {
+            const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 8);
+            const crewMessages = lines.map((line: string) => {
+              const cleanLine = line.trim();
+              let type = 'spark';
+              const lower = cleanLine.toLowerCase();
+              if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
+              else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
+              else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
+              else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
+              return { type, text: cleanLine };
+            });
+            setChatMessages(prev => [...prev, ...crewMessages]);
+            setIsResponding(false);
+            return;
+          }
+        }
       }
+
+      // Fallback if no offer
+      setChatMessages(prev => [...prev, { type: 'clara', text: "I don't have an offer loaded right now. Please upload one first." }]);
     } catch (err) {
       console.error(err);
-      setChatMessages(prev => [...prev, { type: 'clara', text: "I'm sorry, I'm having trouble responding right now." }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "Sorry, I'm having trouble responding right now." }]);
     }
 
     setIsResponding(false);
   };
 
-  // ... (rest of the file - loadPastOffer, getIconPath, getUserInitial remain the same)
+  // ... rest of the file (loadPastOffer, getIconPath, getUserInitial) remains the same
 
   const loadPastOffer = async (offer: any) => {
     setLatestOffer(offer);
@@ -224,7 +234,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation and Tab Bar */}
+      {/* Navigation and Tab Bar (same as before) */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
