@@ -3,9 +3,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
-import * as pdfjsLib from 'pdfjs-dist';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs`;
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
@@ -69,62 +66,20 @@ export default function Dashboard() {
     });
   };
 
-  const convertPdfToImages = async (file: File): Promise<File[]> => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const images: File[] = [];
-      const numPages = Math.min(pdf.numPages, 4);
-
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.5 });
-
-        const canvas = document.createElement('canvas');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        const ctx = canvas.getContext('2d', { alpha: false })!;
-
-        const renderContext = {
-          canvasContext: ctx,
-          viewport: viewport,
-          canvas: canvas
-        };
-
-        await page.render(renderContext).promise;
-
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.78));
-        if (blob) {
-          images.push(new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
-        }
-      }
-      return images;
-    } catch (err) {
-      console.error("PDF conversion error:", err);
-      return [];
-    }
-  };
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       let files = Array.from(e.target.files).slice(0, 4);
       const processed: File[] = [];
-      let totalProcessed = 0;
 
       for (const file of files) {
-        if (totalProcessed >= 4) break;
-        if (file.type === 'application/pdf') {
-          const images = await convertPdfToImages(file);
-          processed.push(...images.slice(0, 4 - totalProcessed));
-          totalProcessed += images.length;
-        } else if (file.type.startsWith('image/')) {
+        if (file.type.startsWith('image/')) {
           const compressed = await compressImage(file);
           processed.push(compressed);
-          totalProcessed++;
+        } else if (file.type === 'application/pdf') {
+          alert("PDF support is temporarily disabled for build stability. Please take photos of the pages instead.");
+          return;
         } else {
           processed.push(file);
-          totalProcessed++;
         }
       }
       setSelectedFiles(processed.slice(0, 4));
@@ -326,17 +281,17 @@ export default function Dashboard() {
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
                 <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
                 <p className="text-amber-700 mb-4">Redact with black Sharpie: name, address, account numbers.</p>
-                <p className="text-red-600 text-xs font-medium">Large PDFs & phone photos are automatically compressed.</p>
+                <p className="text-red-600 text-xs font-medium">Large phone photos are automatically compressed. PDFs coming soon.</p>
               </div>
 
-              <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
+              <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
               <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
-                📤 Select Photos or PDF (max 4)
+                📤 Select Photos (max 4) — PDF support coming soon
               </button>
 
               {selectedFiles.length > 0 && (
                 <div className="mt-6">
-                  <p className="font-medium mb-4">{selectedFiles.length} page(s) ready</p>
+                  <p className="font-medium mb-4">{selectedFiles.length} file(s) ready</p>
                   <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
                     {uploading ? 'Processing...' : 'Send to the Crew →'}
                   </button>
@@ -344,7 +299,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* CENTER: Chat */}
+            {/* CENTER: Chat Interface */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
                 <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
