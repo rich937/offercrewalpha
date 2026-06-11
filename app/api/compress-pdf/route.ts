@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFDocument.load(arrayBuffer);
 
-    // Compress by removing metadata and optimizing
+    // Optimize
     pdfDoc.setTitle('');
     pdfDoc.setAuthor('');
     pdfDoc.setSubject('');
@@ -26,14 +26,13 @@ export async function POST(request: NextRequest) {
       addDefaultPage: false,
     });
 
-    const compressedFile = new File([compressedPdfBytes], file.name, {
-      type: 'application/pdf',
-    });
+    // Fixed: Explicit Uint8Array handling
+    const compressedBlob = new Blob([new Uint8Array(compressedPdfBytes)], { type: 'application/pdf' });
+    const compressedFile = new File([compressedBlob], file.name, { type: 'application/pdf' });
 
     return new NextResponse(compressedFile, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${file.name}"`,
       },
     });
   } catch (error) {

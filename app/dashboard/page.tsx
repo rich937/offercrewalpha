@@ -75,7 +75,11 @@ export default function Dashboard() {
       body: formData,
     });
 
-    if (!res.ok) throw new Error('PDF compression failed');
+    if (!res.ok) {
+      console.error('PDF compression failed, using original');
+      return file;
+    }
+
     const blob = await res.blob();
     return new File([blob], file.name, { type: 'application/pdf' });
   };
@@ -90,13 +94,8 @@ export default function Dashboard() {
           const compressed = await compressImage(file);
           processed.push(compressed);
         } else if (file.type === 'application/pdf') {
-          try {
-            const compressedPdf = await compressPdf(file);
-            processed.push(compressedPdf);
-          } catch (err) {
-            console.error(err);
-            processed.push(file); // fallback
-          }
+          const compressedPdf = await compressPdf(file);
+          processed.push(compressedPdf);
         } else {
           processed.push(file);
         }
@@ -294,7 +293,6 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'dashboard' && (
           <div className="flex gap-8 h-[calc(100vh-180px)]">
-            {/* LEFT: Upload */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
@@ -318,7 +316,6 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* CENTER: Chat Interface */}
             <div className="flex-1 flex flex-col min-w-0">
               <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
                 <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -360,7 +357,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* RIGHT: Previous Offers */}
             <div className="w-80 flex-shrink-0">
               <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
               <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
