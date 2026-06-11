@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -21,105 +20,39 @@ export default function Dashboard() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        if (currentUser) {
+          // TODO: load full history here later
+        }
+      } catch (e) {
+        console.error("Supabase init failed:", e);
+      }
       setLoading(false);
-      if (user) await loadHistory(user.id);
     };
     init();
   }, []);
 
-  const loadHistory = async (userId: string) => {
-    const { data } = await supabase
-      .from('offers')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    setHistory(data || []);
-    if (data?.length) setLatestOffer(data[0]);
-  };
-
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let { width, height } = img;
-          const maxDim = 1600;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) { height = (height * maxDim) / width; width = maxDim; }
-            else { width = (width * maxDim) / height; height = maxDim; }
-          }
-          canvas.width = width; canvas.height = height;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            if (blob) resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg', lastModified: Date.now() }));
-            else resolve(file);
-          }, 'image/jpeg', 0.82);
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const compressPdf = async (file: File): Promise<File> => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const res = await fetch('/api/compress-pdf', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!res.ok) {
-      console.error('PDF compression failed, using original');
-      return file;
-    }
-
-    const blob = await res.blob();
-    return new File([blob], file.name, { type: 'application/pdf' });
-  };
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       let files = Array.from(e.target.files).slice(0, 4);
-      const processed: File[] = [];
-
-      for (const file of files) {
-        if (file.type.startsWith('image/')) {
-          const compressed = await compressImage(file);
-          processed.push(compressed);
-        } else if (file.type === 'application/pdf') {
-          const compressedPdf = await compressPdf(file);
-          processed.push(compressedPdf);
-        } else {
-          processed.push(file);
-        }
-      }
-      setSelectedFiles(processed.slice(0, 4));
+      setSelectedFiles(files);
     }
   };
 
   const analyzeWithCrew = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0 || !user) return;
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Processing ${selectedFiles.length} file(s)...` }]);
 
     try {
-      const timestamp = Date.now();
-      const offerId = `${user.id}-${timestamp}`;
-      const uploadedPaths: string[] = [];
-
-      for (const file of selectedFiles) {
-        const filePath = `${user.id}/offers/${offerId}/${file.name}`;
-        await supabase.storage.from('mail-pieces').upload(filePath, file, { upsert: true });
-        uploadedPaths.push(filePath);
-      }
-
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
@@ -129,37 +62,25 @@ export default function Dashboard() {
       let detectedLender = 'Unknown Lender';
       if (result.crewResponse) {
         const text = result.crewResponse.toLowerCase();
-        if (text.includes('citi') || text.includes('strata')) detectedLender = 'Citi';
+        if (text.includes('citi')) detectedLender = 'Citi';
         else if (text.includes('capital one')) detectedLender = 'Capital One';
         else if (text.includes('figure')) detectedLender = 'Figure';
       }
 
-      const { data: newOffer } = await supabase.from('offers').insert({
-        user_id: user.id,
-        offer_id: offerId,
-        lender: detectedLender,
-        file_paths: uploadedPaths,
-        file_count: selectedFiles.length,
-        sequence_number: timestamp
-      }).select().single();
+      // Add to chat
+      const lines = (result.crewResponse || "Crew response placeholder").split('\n').filter((l: string) => l.trim());
+      const crewMsgs = lines.map((line: string) => {
+        const clean = line.trim();
+        let type = 'spark';
+        const lower = clean.toLowerCase();
+        if (lower.startsWith('ledger')) type = 'ledger';
+        else if (lower.startsWith('shade')) type = 'shade';
+        else if (lower.startsWith('clara')) type = 'clara';
+        else if (lower.startsWith('spark')) type = 'spark';
+        return { type, text: clean };
+      });
 
-      if (result.crewResponse) {
-        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 5);
-        const crewMessages = lines.map((line: string) => {
-          const clean = line.trim();
-          let type = 'spark';
-          const lower = clean.toLowerCase();
-          if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
-          else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
-          else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
-          else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
-          return { type, text: clean };
-        });
-        setChatMessages(crewMessages);
-      }
-
-      if (newOffer) setLatestOffer(newOffer);
-      await loadHistory(user.id);
+      setChatMessages(crewMsgs);
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that offer." }]);
@@ -170,84 +91,32 @@ export default function Dashboard() {
   };
 
   const sendUserMessage = async () => {
-    if (!userInput.trim() || !user || isResponding) return;
-
-    const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
+    if (!userInput.trim() || isResponding) return;
+    const username = user?.email?.split('@')[0] || 'User';
     setChatMessages(prev => [...prev, { type: 'user', text: userInput, username }]);
-
     const question = userInput;
     setUserInput('');
     setIsResponding(true);
 
     try {
-      if (latestOffer?.file_paths?.length) {
-        const formData = new FormData();
-        const { data: fileData } = await supabase.storage.from('mail-pieces').download(latestOffer.file_paths[0]);
-        if (fileData) {
-          const file = new File([fileData], 'current-offer.jpg', { type: 'image/jpeg' });
-          formData.append('files', file);
-
-          const res = await fetch('/api/analyze', { method: 'POST', body: formData });
-          const result = await res.json();
-
-          if (result.crewResponse) {
-            const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 5);
-            const crewMessages = lines.map((line: string) => {
-              const clean = line.trim();
-              let type = 'spark';
-              const lower = clean.toLowerCase();
-              if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
-              else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
-              else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
-              else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
-              return { type, text: clean };
-            });
-            setChatMessages(prev => [...prev, ...crewMessages]);
-          }
-        }
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: question })
+      });
+      const data = await res.json();
+      if (data.crewResponse) {
+        const lines = data.crewResponse.split('\n').filter((l: string) => l.trim());
+        const crewMsgs = lines.map((line: string) => ({
+          type: 'spark',
+          text: line.trim()
+        }));
+        setChatMessages(prev => [...prev, ...crewMsgs]);
       }
     } catch (err) {
-      console.error(err);
-      setChatMessages(prev => [...prev, { type: 'clara', text: "Sorry, I'm having trouble responding right now." }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "Sorry, I'm having trouble responding." }]);
     }
-
     setIsResponding(false);
-  };
-
-  const loadPastOffer = async (offer: any) => {
-    setLatestOffer(offer);
-    setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.lender || 'offer'}...` }]);
-
-    try {
-      if (offer.file_paths && offer.file_paths.length > 0) {
-        const formData = new FormData();
-        const { data: fileData } = await supabase.storage.from('mail-pieces').download(offer.file_paths[0]);
-        if (fileData) {
-          const file = new File([fileData], 'offer.jpg', { type: 'image/jpeg' });
-          formData.append('files', file);
-
-          const res = await fetch('/api/analyze', { method: 'POST', body: formData });
-          const result = await res.json();
-
-          if (result.crewResponse) {
-            const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 5);
-            const crewMessages = lines.map((line: string) => {
-              const clean = line.trim();
-              let type = 'spark';
-              const lower = clean.toLowerCase();
-              if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
-              else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
-              else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
-              else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
-              return { type, text: clean };
-            });
-            setChatMessages(crewMessages);
-          }
-        }
-      }
-    } catch (e) {
-      setChatMessages([{ type: 'system', text: "Sorry, I had trouble re-analyzing that offer." }]);
-    }
   };
 
   const getIconPath = (type: string) => {
@@ -259,10 +128,8 @@ export default function Dashboard() {
     return '/icons/Ledger Icon.png';
   };
 
-  const getUserInitial = (): string => {
-    if (!user) return '?';
-    const name = user.user_metadata?.username || user.email || 'User';
-    return name.charAt(0).toUpperCase();
+  const getUserInitial = () => {
+    return (user?.email || 'U').charAt(0).toUpperCase();
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -276,104 +143,90 @@ export default function Dashboard() {
             <span className="text-red-600 font-semibold text-xl">Alpha Site</span>
           </div>
           <div className="flex items-center gap-6">
-            <span>Welcome, <strong>{user?.user_metadata?.username || user?.email}</strong></span>
-            <button onClick={() => supabase.auth.signOut().then(() => window.location.href = '/login')} className="text-gray-500 hover:text-black">Sign Out</button>
+            <span>Welcome, <strong>{user?.email?.split('@')[0]}</strong></span>
+            <button onClick={() => window.location.href = '/login'} className="text-gray-500 hover:text-black">Sign Out</button>
           </div>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 pt-6 border-b bg-white">
         <div className="flex gap-10 text-lg font-medium">
-          <button onClick={() => setActiveTab('dashboard')} className={`pb-4 border-b-2 transition-colors ${activeTab === 'dashboard' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Dashboard</button>
-          <Link href="/blog" className="pb-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">Blog / Podcasts</Link>
-          <button onClick={() => setActiveTab('about')} className={`pb-4 border-b-2 transition-colors ${activeTab === 'about' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>About</button>
+          <button onClick={() => setActiveTab('dashboard')} className={`pb-4 border-b-2 ${activeTab === 'dashboard' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Dashboard</button>
+          <Link href="/blog" className="pb-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700">Blog / Podcasts</Link>
+          <button onClick={() => setActiveTab('about')} className={`pb-4 border-b-2 ${activeTab === 'about' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>About</button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {activeTab === 'dashboard' && (
-          <div className="flex gap-8 h-[calc(100vh-180px)]">
-            <div className="w-80 flex-shrink-0">
-              <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
-              <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
-                <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
-                <p className="text-amber-700 mb-4">Redact with black Sharpie: name, address, account numbers.</p>
-                <p className="text-red-600 text-xs font-medium">Large PDFs are automatically compressed on the server.</p>
-              </div>
-
-              <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
-              <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
-                📤 Select Photos or PDF (max 4)
+      {activeTab === 'dashboard' && (
+        <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
+          {/* LEFT: Upload */}
+          <div className="w-80 flex-shrink-0">
+            <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
+            <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
+              <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
+              <p className="text-amber-700">Redact name, address, account numbers with Sharpie.</p>
+            </div>
+            <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
+            <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
+              📤 Select Photos or PDF (max 4)
+            </button>
+            {selectedFiles.length > 0 && (
+              <button onClick={analyzeWithCrew} disabled={uploading} className="mt-6 w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-2xl font-semibold">
+                {uploading ? 'Processing...' : 'Send to the Crew →'}
               </button>
+            )}
+          </div>
 
-              {selectedFiles.length > 0 && (
-                <div className="mt-6">
-                  <p className="font-medium mb-4">{selectedFiles.length} file(s) ready</p>
-                  <button onClick={analyzeWithCrew} disabled={uploading} className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 text-white py-4 rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
-                    {uploading ? 'Processing...' : 'Send to the Crew →'}
-                  </button>
+          {/* CENTER: Chat */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
+              <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
+                <div className="bg-blue-100 p-5 flex items-center justify-center border-b">
+                  <img src="/logo.png" alt="OfferCrew" className="h-9" />
                 </div>
-              )}
-            </div>
-
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
-                <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
-                  <div className="bg-blue-100 p-5 flex items-center justify-center border-b">
-                    <img src="/logo.png" alt="OfferCrew" className="h-9" />
-                  </div>
-                  <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
-                    {chatMessages.map((msg, i) => (
-                      <div key={i} className={`flex ${msg.type === 'system' ? 'justify-center' : 'items-start gap-3'}`}>
-                        {msg.type === 'user' ? (
-                          <div className="w-11 h-11 flex-shrink-0 rounded-2xl bg-cyan-600 text-white flex items-center justify-center text-xl font-bold mt-1">
-                            {getUserInitial()}
-                          </div>
-                        ) : msg.type !== 'system' && (
-                          <img src={getIconPath(msg.type)} alt={msg.type} className="w-11 h-11 flex-shrink-0 rounded-2xl object-cover shadow-md mt-1" />
-                        )}
-                        <div className={`p-4 rounded-3xl flex-1 max-w-[78%] ${msg.type === 'system' ? 'bg-gray-100 text-center' : msg.type === 'user' ? 'bg-blue-50' : 'bg-white shadow-sm'}`}>
-                          {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1 font-medium">{msg.username}</div>}
-                          {msg.type !== 'user' && msg.type !== 'system' && <div className="text-xs text-cyan-600 mb-1 font-medium capitalize">{msg.type}</div>}
-                          {msg.text}
-                        </div>
+                <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'items-start gap-3'}`}>
+                      {msg.type !== 'user' && <img src={getIconPath(msg.type)} alt="" className="w-10 h-10 rounded-2xl mt-1" />}
+                      <div className={`p-4 rounded-3xl max-w-[78%] ${msg.type === 'user' ? 'bg-blue-100' : 'bg-white shadow'}`}>
+                        {msg.type === 'user' && <div className="text-xs text-blue-600 mb-1">{msg.username}</div>}
+                        <div>{msg.text}</div>
                       </div>
-                    ))}
-                  </div>
-                  <div className="border-t p-4 bg-white">
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()}
-                        placeholder="Ask the Crew a question..."
-                        className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      />
-                      <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">Send</button>
                     </div>
+                  ))}
+                </div>
+                <div className="border-t p-4 bg-white">
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && sendUserMessage()}
+                      placeholder="Ask the Crew anything..."
+                      className="flex-1 px-5 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl">Send</button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div className="w-80 flex-shrink-0">
-              <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
-              <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
-                {history.length === 0 && <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>}
-                {history.map((offer) => (
-                  <div key={offer.id} onClick={() => loadPastOffer(offer)} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all active:scale-[0.98]">
-                    <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
-                    <p className="text-sm text-gray-500">#{String(offer.sequence_number || offer.id).padStart(6, '0')}</p>
-                    <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
-                    <p className="text-xs text-gray-400 mt-3">{new Date(offer.created_at).toLocaleDateString()}</p>
-                  </div>
-                ))}
               </div>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* RIGHT: Previous Offers */}
+          <div className="w-80 flex-shrink-0">
+            <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
+            <div className="space-y-3 overflow-y-auto" style={{ maxHeight: '620px' }}>
+              {history.length === 0 && <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>}
+              {history.map((offer, i) => (
+                <div key={i} className="bg-white border rounded-2xl p-5 hover:border-cyan-400 cursor-pointer">
+                  <p className="font-semibold">{offer.lender || 'Offer'}</p>
+                  <p className="text-xs text-gray-500">#{String(i+1).padStart(6, '0')}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
