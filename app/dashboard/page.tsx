@@ -66,6 +66,20 @@ export default function Dashboard() {
     });
   };
 
+  const compressPdf = async (file: File): Promise<File> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/compress-pdf', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error('PDF compression failed');
+    const blob = await res.blob();
+    return new File([blob], file.name, { type: 'application/pdf' });
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       let files = Array.from(e.target.files).slice(0, 4);
@@ -76,8 +90,13 @@ export default function Dashboard() {
           const compressed = await compressImage(file);
           processed.push(compressed);
         } else if (file.type === 'application/pdf') {
-          alert("PDF support is temporarily disabled for build stability. Please take photos of the pages instead.");
-          return;
+          try {
+            const compressedPdf = await compressPdf(file);
+            processed.push(compressedPdf);
+          } catch (err) {
+            console.error(err);
+            processed.push(file); // fallback
+          }
         } else {
           processed.push(file);
         }
@@ -89,7 +108,7 @@ export default function Dashboard() {
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
     setUploading(true);
-    setChatMessages([{ type: 'system', text: `Processing ${selectedFiles.length} page(s)...` }]);
+    setChatMessages([{ type: 'system', text: `Processing ${selectedFiles.length} file(s)...` }]);
 
     try {
       const timestamp = Date.now();
@@ -281,12 +300,12 @@ export default function Dashboard() {
               <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
                 <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
                 <p className="text-amber-700 mb-4">Redact with black Sharpie: name, address, account numbers.</p>
-                <p className="text-red-600 text-xs font-medium">Large phone photos are automatically compressed. PDFs coming soon.</p>
+                <p className="text-red-600 text-xs font-medium">Large PDFs are automatically compressed on the server.</p>
               </div>
 
-              <input id="fileInput" type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+              <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
               <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
-                📤 Select Photos (max 4) — PDF support coming soon
+                📤 Select Photos or PDF (max 4)
               </button>
 
               {selectedFiles.length > 0 && (
