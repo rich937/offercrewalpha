@@ -162,7 +162,7 @@ export default function Dashboard() {
       await loadHistory(user.id);
     } catch (err) {
       console.error(err);
-      setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that offer. Try photos if PDF fails." }]);
+      setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that offer." }]);
     }
 
     setSelectedFiles([]);
@@ -376,4 +376,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
+} 
