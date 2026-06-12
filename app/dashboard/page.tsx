@@ -164,11 +164,21 @@ export default function Dashboard() {
       // Split and clean messages
       const lines = (result.crewResponse || "The Crew responded.").split('\n').filter((l: string) => l.trim().length > 3);
 
+       // Stronger cleaning - remove speaker names and markdown
       const crewMessages = lines.map((line: string) => {
-        let cleanText = line.trim()
+        let cleanText = line.trim();
+
+        // Remove common speaker prefixes
+        cleanText = cleanText
           .replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '')
-          .replace(/^\*\s*/, '')
-          .replace(/\*([^*]+)\*/g, '$1');
+          .replace(/^\*(Ledger|Shade|Spark|Clara):\*\s*/i, '')
+          .replace(/^(Ledger|Shade|Spark|Clara)\s*[:*—-]\s*/i, '');
+
+        // Remove leftover markdown and artifacts
+        cleanText = cleanText
+          .replace(/\*([^*]+)\*/g, '$1')           // Remove *bold*
+          .replace(/^\*\s*/, '')                   // Remove leading *
+          .replace(/\s*\*\s*$/, '');               // Remove trailing *
 
         let type = 'spark';
         const lower = line.toLowerCase();
@@ -177,7 +187,10 @@ export default function Dashboard() {
         else if (lower.includes('clara')) type = 'clara';
         else if (lower.includes('spark')) type = 'spark';
 
-        return { type, text: cleanText.trim() };
+        return { 
+          type, 
+          text: cleanText.trim() 
+        };
       });
 
       setChatMessages(crewMessages);
