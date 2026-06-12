@@ -86,7 +86,7 @@ export default function Dashboard() {
         canvas.width = viewport.width;
         const ctx = canvas.getContext('2d')!;
 
-        // Fixed and type-safe render call
+        // Safe render call
         await (page.render as any)({
           canvasContext: ctx,
           viewport: viewport
