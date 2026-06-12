@@ -57,7 +57,7 @@ export default function Dashboard() {
     }
   };
 
-  const analyzeWithCrew = async () => {
+    const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0 || !user) return;
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Processing ${selectedFiles.length} file(s)...` }]);
@@ -66,31 +66,29 @@ export default function Dashboard() {
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
-      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
-      const result = await res.json();
-
-      let detectedLender = 'Unknown Lender';
-      if (result.crewResponse) {
-        const text = result.crewResponse.toLowerCase();
-        if (text.includes('citi') || text.includes('strata')) detectedLender = 'Citi';
-        else if (text.includes('capital one')) detectedLender = 'Capital One';
-        else if (text.includes('figure')) detectedLender = 'Figure';
-      }
-
-      const lines = (result.crewResponse || "The Crew responded!").split('\n').filter((l: string) => l.trim().length > 3);
-      const crewMessages = lines.map((line: string) => {
-        const clean = line.trim();
-        let type = 'spark';
-        const lower = clean.toLowerCase();
-        if (lower.startsWith('ledger') || lower.includes('ledger:')) type = 'ledger';
-        else if (lower.startsWith('shade') || lower.includes('shade:')) type = 'shade';
-        else if (lower.startsWith('clara') || lower.includes('clara:')) type = 'clara';
-        else if (lower.startsWith('spark') || lower.includes('spark:')) type = 'spark';
-        return { type, text: clean };
+      const res = await fetch('/api/analyze', { 
+        method: 'POST', 
+        body: formData 
       });
 
-      setChatMessages(crewMessages);
-      setLatestOffer({ lender: detectedLender, file_count: selectedFiles.length });
+      const result = await res.json();
+
+      if (result.crewResponse) {
+        const lines = result.crewResponse.split('\n').filter((l: string) => l.trim().length > 3);
+        const crewMessages = lines.map((line: string) => {
+          const clean = line.trim();
+          let type = 'spark';
+          const lower = clean.toLowerCase();
+          if (lower.startsWith('ledger')) type = 'ledger';
+          else if (lower.startsWith('shade')) type = 'shade';
+          else if (lower.startsWith('clara')) type = 'clara';
+          else if (lower.startsWith('spark')) type = 'spark';
+          return { type, text: clean };
+        });
+        setChatMessages(crewMessages);
+      } else {
+        setChatMessages([{ type: 'system', text: result.error || "Sorry, analysis failed." }]);
+      }
     } catch (err) {
       console.error(err);
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that offer." }]);
