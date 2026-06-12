@@ -22,10 +22,7 @@ export default function Dashboard() {
     const init = async () => {
       try {
         const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         setUser(currentUser);
         if (currentUser) await loadHistory(currentUser.id, supabase);
@@ -38,19 +35,91 @@ export default function Dashboard() {
   }, []);
 
   const loadHistory = async (userId: string, supabase: any) => {
-    const { data } = await supabase
-      .from('offers')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const { data } = await supabase.from('offers').select('*').eq('user_id', userId).order('created_at', { ascending: false });
     setHistory(data || []);
     if (data?.length) setLatestOffer(data[0]);
   };
 
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          const maxDim = 1600;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) height = (height * maxDim) / width;
+            else width = (width * maxDim) / height;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+            else resolve(file);
+          }, 'image/jpeg', 0.82);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const convertPdfToImages = async (file: File): Promise<File[]> => {
+    try {
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const images: File[] = [];
+      const numPages = Math.min(pdf.numPages, 4);
+
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const ctx = canvas.getContext('2d')!;
+
+        await page.render({
+          canvasContext: ctx,
+          viewport: viewport
+        }).promise;
+
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+        if (blob) {
+          images.push(new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
+        }
+      }
+      return images;
+    } catch (err) {
+      console.error("PDF conversion error:", err);
+      return [];
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).slice(0, 4);
-      setSelectedFiles(files);
+      let files = Array.from(e.target.files).slice(0, 4);
+      const processed: File[] = [];
+
+      for (const file of files) {
+        if (file.type === 'application/pdf') {
+          const images = await convertPdfToImages(file);
+          processed.push(...images);
+        } else if (file.type.startsWith('image/')) {
+          const compressed = await compressImage(file);
+          processed.push(compressed);
+        } else {
+          processed.push(file);
+        }
+      }
+      setSelectedFiles(processed.slice(0, 8));
     }
   };
 
@@ -88,7 +157,6 @@ export default function Dashboard() {
 
       setChatMessages(crewMessages);
 
-      // Add to Previous Offers
       const newOffer = {
         lender: detectedLender,
         file_count: selectedFiles.length,
@@ -175,13 +243,12 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-          {/* LEFT: Upload */}
           <div className="w-80 flex-shrink-0">
             <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
             <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
               <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
               <p className="text-amber-700 mb-4">Redact name, address, account numbers with Sharpie before uploading.</p>
-              <p className="text-red-600 text-xs font-medium">Large files are automatically compressed.</p>
+              <p className="text-red-600 text-xs font-medium">PDFs are converted to images and everything is compressed.</p>
             </div>
 
             <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
@@ -196,7 +263,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* CENTER: Chat */}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
               <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -233,7 +299,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* RIGHT: Previous Offers */}
           <div className="w-80 flex-shrink-0">
             <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
             <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
@@ -243,7 +308,6 @@ export default function Dashboard() {
                   <p className="font-semibold text-lg">{offer.lender || 'Unknown Lender'}</p>
                   <p className="text-sm text-gray-500">#{String(offer.sequence_number || i+1).padStart(6, '0')}</p>
                   <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
-                  <p className="text-xs text-gray-400 mt-3">{new Date(offer.created_at || Date.now()).toLocaleDateString()}</p>
                 </div>
               ))}
             </div>
