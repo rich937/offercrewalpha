@@ -27,9 +27,6 @@ export default function Dashboard() {
         );
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         setUser(currentUser);
-        if (currentUser) {
-          // TODO: Load real history from Supabase later
-        }
       } catch (e) {
         console.error(e);
       }
@@ -161,42 +158,54 @@ export default function Dashboard() {
       else if (responseText.includes('chase')) detectedLender = 'Chase';
       else if (responseText.includes('sofi')) detectedLender = 'SoFi';
 
-      // Split and clean messages
-      const lines = (result.crewResponse || "The Crew responded.").split('\n').filter((l: string) => l.trim().length > 3);
+      // === STRONG JSON PARSING ===
+      let messagesToShow: any[] = [];
 
-       // Stronger cleaning - remove speaker names and markdown
-         // Ultra-aggressive name + markdown cleaning
-      const crewMessages = lines.map((line: string) => {
-        let cleanText = line.trim();
+      try {
+        let rawResponse = result.crewResponse || "[]";
+        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
+        if (jsonMatch) rawResponse = jsonMatch[0];
 
-        // Remove speaker prefixes in many formats
-        cleanText = cleanText
-          .replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '')
-          .replace(/^\*(Ledger|Shade|Spark|Clara):\*\s*/i, '')
-          .replace(/^(Ledger|Shade|Spark|Clara)\s*[:*—-]\s*/i, '')
-          .replace(/^\*\s*(Ledger|Shade|Spark|Clara)\s*\*:\s*/i, '');
+        const parsed = JSON.parse(rawResponse);
 
-        // Clean markdown and extra formatting
-        cleanText = cleanText
-          .replace(/\*([^*]+)\*/g, '$1')
-          .replace(/^\*\s*/, '')
-          .replace(/\s*\*\s*$/, '')
-          .replace(/^\s*[-•]\s*/, '');
+        if (Array.isArray(parsed)) {
+          messagesToShow = parsed.map((item: any) => ({
+            type: (item.speaker || item.name || 'spark').toLowerCase(),
+            text: (item.text || item.message || String(item)).trim()
+          }));
+        }
+      } catch (e) {
+        console.error("JSON parse failed, using fallback", e);
+        const lines = (result.crewResponse || "").split('\n').filter(l => l.trim().length > 3);
+        messagesToShow = lines.map((line: string) => {
+          let text = line.trim();
+          let type = 'spark';
+          const lower = line.toLowerCase();
+          if (lower.includes('ledger')) type = 'ledger';
+          else if (lower.includes('shade')) type = 'shade';
+          else if (lower.includes('clara')) type = 'clara';
+          else if (lower.includes('spark')) type = 'spark';
 
-        let type = 'spark';
-        const lower = line.toLowerCase();
-        if (lower.includes('ledger')) type = 'ledger';
-        else if (lower.includes('shade')) type = 'shade';
-        else if (lower.includes('clara')) type = 'clara';
-        else if (lower.includes('spark')) type = 'spark';
+          text = text.replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '');
+          return { type, text: text.trim() };
+        });
+      }
 
-        return { 
-          type, 
-          text: cleanText.trim() 
-        };
-      });
+      // Final cleanup
+      messagesToShow = messagesToShow
+        .map(msg => ({
+          ...msg,
+          text: msg.text
+            .replace(/^\s*\{.*\}\s*,?\s*$/g, '')
+            .replace(/^\s*\[\s*\{.*\}\s*\]\s*$/g, '')
+            .trim()
+        }))
+        .filter(msg => msg.text.length > 5);
 
-      setChatMessages(crewMessages);
+      setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ 
+        type: 'system', 
+        text: result.crewResponse || "The Crew responded." 
+      }]);
 
       // Add to Previous Offers
       const newOffer = {
@@ -250,7 +259,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Nav */}
       <nav className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -264,7 +272,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Tabs */}
       <div className="max-w-7xl mx-auto px-6 pt-6 border-b bg-white">
         <div className="flex gap-10 text-lg font-medium">
           <button onClick={() => setActiveTab('dashboard')} className={`pb-4 border-b-2 ${activeTab === 'dashboard' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Dashboard</button>
@@ -310,7 +317,6 @@ export default function Dashboard() {
                   <img src="/logo.png" alt="OfferCrew" className="h-9" />
                 </div>
 
-                {/* UPDATED CHAT SECTION */}
                 <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
                   {chatMessages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'items-start gap-3'}`}>
@@ -338,7 +344,6 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* Chat Input */}
                 <div className="border-t p-4 bg-white">
                   <div className="flex gap-3">
                     <input
