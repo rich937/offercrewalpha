@@ -153,15 +153,22 @@ export default function Dashboard() {
       }
 
       const lines = (result.crewResponse || "The Crew responded.").split('\n').filter((l: string) => l.trim().length > 5);
-      const crewMessages = lines.map((line: string) => {
-        let clean = line.trim().replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '');
+          const crewMessages = lines.map((line: string) => {
+        let cleanText = line.trim()
+          .replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '')   // Remove name if present
+          .replace(/^\*\s*/, '');                            // Clean any markdown
+
         let type = 'spark';
         const lower = line.toLowerCase();
-        if (lower.startsWith('ledger')) type = 'ledger';
-        else if (lower.startsWith('shade')) type = 'shade';
-        else if (lower.startsWith('clara')) type = 'clara';
-        else if (lower.startsWith('spark')) type = 'spark';
-        return { type, text: clean };
+        if (lower.includes('ledger')) type = 'ledger';
+        else if (lower.includes('shade')) type = 'shade';
+        else if (lower.includes('clara')) type = 'clara';
+        else if (lower.includes('spark')) type = 'spark';
+
+        return { 
+          type, 
+          text: cleanText 
+        };
       });
 
       setChatMessages(crewMessages);
