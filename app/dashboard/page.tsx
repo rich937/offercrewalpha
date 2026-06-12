@@ -27,6 +27,10 @@ export default function Dashboard() {
         );
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         setUser(currentUser);
+
+        if (currentUser) {
+          await loadHistory(currentUser.id, supabase);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -34,6 +38,17 @@ export default function Dashboard() {
     };
     init();
   }, []);
+
+  const loadHistory = async (userId: string, supabase: any) => {
+    const { data, error } = await supabase
+      .from('offers')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) console.error('Error loading history:', error);
+    else setHistory(data || []);
+  };
 
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve) => {
@@ -147,7 +162,7 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // Improved lender detection
+      // Lender detection
       let detectedLender = 'Unknown Lender';
       const responseText = (result.crewResponse || '').toLowerCase();
       if (responseText.includes('pnc')) detectedLender = 'PNC';
@@ -207,14 +222,24 @@ export default function Dashboard() {
         text: result.crewResponse || "The Crew responded." 
       }]);
 
-      // Add to Previous Offers
-      const newOffer = {
+      // Save to Supabase
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { error: insertError } = await supabase.from('offers').insert({
+        user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
-        created_at: new Date().toISOString(),
-        sequence_number: Date.now()
-      };
-      setHistory(prev => [newOffer, ...prev]);
+        sequence_number: Date.now(),
+      });
+
+      if (insertError) console.error('Failed to save offer:', insertError);
+
+      // Refresh history
+      await loadHistory(user.id, supabase);
 
     } catch (err) {
       console.error(err);
