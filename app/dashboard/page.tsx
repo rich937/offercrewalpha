@@ -158,7 +158,7 @@ export default function Dashboard() {
       else if (responseText.includes('chase')) detectedLender = 'Chase';
       else if (responseText.includes('sofi')) detectedLender = 'SoFi';
 
-      // === STRONG JSON PARSING ===
+      // Strong JSON Parsing
       let messagesToShow: any[] = [];
 
       try {
@@ -176,7 +176,7 @@ export default function Dashboard() {
         }
       } catch (e) {
         console.error("JSON parse failed, using fallback", e);
-        const lines = (result.crewResponse || "").split('\n').filter(l => l.trim().length > 3);
+        const lines = (result.crewResponse || "").split('\n').filter((l: string) => l.trim().length > 3);
         messagesToShow = lines.map((line: string) => {
           let text = line.trim();
           let type = 'spark';
@@ -282,7 +282,6 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-          {/* Upload Panel */}
           <div className="w-80 flex-shrink-0">
             <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
             <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
@@ -309,7 +308,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Chat Interface */}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
               <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -367,7 +365,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Previous Offers */}
           <div className="w-80 flex-shrink-0">
             <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
             <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: '620px' }}>
