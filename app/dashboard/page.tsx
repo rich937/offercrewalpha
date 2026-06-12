@@ -165,21 +165,23 @@ export default function Dashboard() {
       const lines = (result.crewResponse || "The Crew responded.").split('\n').filter((l: string) => l.trim().length > 3);
 
        // Stronger cleaning - remove speaker names and markdown
+         // Ultra-aggressive name + markdown cleaning
       const crewMessages = lines.map((line: string) => {
         let cleanText = line.trim();
 
-        // Remove common speaker prefixes
+        // Remove speaker prefixes in many formats
         cleanText = cleanText
           .replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '')
           .replace(/^\*(Ledger|Shade|Spark|Clara):\*\s*/i, '')
-          .replace(/^\*(Ledger:*|Shade:*|Spark:*|Clara:*)\s*/i, '')
-          .replace(/^(Ledger|Shade|Spark|Clara)\s*[:*—-]\s*/i, '');
+          .replace(/^(Ledger|Shade|Spark|Clara)\s*[:*—-]\s*/i, '')
+          .replace(/^\*\s*(Ledger|Shade|Spark|Clara)\s*\*:\s*/i, '');
 
-        // Remove leftover markdown and artifacts
+        // Clean markdown and extra formatting
         cleanText = cleanText
-          .replace(/\*([^*]+)\*/g, '$1')           // Remove *bold*
-          .replace(/^\*\s*/, '')                   // Remove leading *
-          .replace(/\s*\*\s*$/, '');               // Remove trailing *
+          .replace(/\*([^*]+)\*/g, '$1')
+          .replace(/^\*\s*/, '')
+          .replace(/\s*\*\s*$/, '')
+          .replace(/^\s*[-•]\s*/, '');
 
         let type = 'spark';
         const lower = line.toLowerCase();
