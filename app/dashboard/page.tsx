@@ -68,18 +68,55 @@ export default function Dashboard() {
     });
   };
 
-  // Simplified - PDFs passed through for now (no complex conversion)
+  const convertPdfToImages = async (file: File): Promise<File[]> => {
+    try {
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const images: File[] = [];
+      const numPages = Math.min(pdf.numPages, 4);
+
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const ctx = canvas.getContext('2d')!;
+
+        await (page.render as any)({
+          canvasContext: ctx,
+          viewport: viewport
+        }).promise;
+
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        if (blob) {
+          images.push(new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
+        }
+      }
+      return images;
+    } catch (err) {
+      console.error("PDF conversion error:", err);
+      return [];
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       let files = Array.from(e.target.files).slice(0, 4);
       const processed: File[] = [];
 
       for (const file of files) {
-        if (file.type.startsWith('image/')) {
+        if (file.type === 'application/pdf') {
+          const images = await convertPdfToImages(file);
+          processed.push(...images);
+        } else if (file.type.startsWith('image/')) {
           const compressed = await compressImage(file);
           processed.push(compressed);
         } else {
-          processed.push(file); // PDF passed through
+          processed.push(file);
         }
       }
       setSelectedFiles(processed.slice(0, 8));
@@ -211,7 +248,7 @@ export default function Dashboard() {
             <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
               <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
               <p className="text-amber-700 mb-4">Redact name, address, account numbers with Sharpie before uploading.</p>
-              <p className="text-red-600 text-xs font-medium">Large files are automatically compressed.</p>
+              <p className="text-red-600 text-xs font-medium">PDFs are converted to images and everything is compressed.</p>
             </div>
 
             <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
