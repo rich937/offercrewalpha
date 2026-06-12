@@ -172,6 +172,7 @@ export default function Dashboard() {
         cleanText = cleanText
           .replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '')
           .replace(/^\*(Ledger|Shade|Spark|Clara):\*\s*/i, '')
+          .replace(/^\*(Ledger:*|Shade:*|Spark:*|Clara:*):\*\s*/i, '')
           .replace(/^(Ledger|Shade|Spark|Clara)\s*[:*—-]\s*/i, '');
 
         // Remove leftover markdown and artifacts
