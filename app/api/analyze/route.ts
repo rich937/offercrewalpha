@@ -9,35 +9,27 @@ export async function POST(request: NextRequest) {
     console.log(`[ANALYZE] Received ${files.length} files`);
 
     const sizeLog: any[] = [];
-    const processedFiles: File[] = [];
+    const imageParts: any[] = [];
 
     for (const file of files) {
       const originalSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
       console.log(`[ANALYZE] Original: ${file.name} (${originalSize})`);
 
-      let processedFile: File = file;
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
 
-      if (file.type === 'application/pdf') {
-        // Optimize PDF (metadata removal)
-        const arrayBuffer = await file.arrayBuffer();
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
-        pdfDoc.setTitle(''); 
-        pdfDoc.setAuthor(''); 
-        pdfDoc.setSubject('');
-        const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
-        processedFile = new File([compressedBytes as BlobPart], file.name, { type: 'application/pdf' });
-      } 
-      // Images: skip server compression for now (handled client-side in dashboard)
+      imageParts.push({
+        type: "image_url",
+        image_url: { url: `data:${mimeType};base64,${base64}` }
+      });
 
-      const newSize = (processedFile.size / (1024 * 1024)).toFixed(2) + ' MB';
-      sizeLog.push({ file: file.name, original: originalSize, after: newSize, type: file.type });
-
-      processedFiles.push(processedFile);
+      sizeLog.push({ file: file.name, size: originalSize });
     }
 
-    console.log(`[ANALYZE] Size log:`, sizeLog);
+    console.log(`[ANALYZE] Sending ${imageParts.length} images to Grok`);
 
-    // Real Grok call
+    // Real Grok Vision Call
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -48,22 +40,28 @@ export async function POST(request: NextRequest) {
         model: "grok-3",
         messages: [{
           role: "user",
-          content: "You are the OfferCrew. React to this financial junk mail with fun banter from Ledger, Shade, Spark, and Clara. Identify the lender first."
+          content: [
+            { 
+              type: "text", 
+              text: "You are the OfferCrew (Ledger, Shade, Spark, Clara). Analyze this financial junk mail piece. Start by identifying the lender and offer type. Then react with natural, fun group banter." 
+            },
+            ...imageParts
+          ]
         }],
         temperature: 0.85,
-        max_tokens: 1000,
+        max_tokens: 1200,
       }),
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || "The Crew had trouble processing this piece.";
+    const crewResponse = data.choices?.[0]?.message?.content || "The Crew had trouble seeing this piece.";
 
-    console.log(`[ANALYZE] Grok response length: ${crewResponse.length}`);
+    console.log(`[ANALYZE] Grok response length: ${crewResponse.length} chars`);
 
     return NextResponse.json({ 
       success: true, 
       crewResponse,
-      debug: { sizeLog }
+      debug: { sizeLog, imageCount: imageParts.length }
     });
 
   } catch (error: any) {
