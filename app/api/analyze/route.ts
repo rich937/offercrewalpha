@@ -7,31 +7,25 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ANALYZE] Received ${files.length} files`);
 
-      const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial mail piece.
+          const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial mail piece.
 
 Respond **only** with a valid JSON array like this:
 
 [
   {"speaker": "Ledger", "text": "First message"},
   {"speaker": "Shade", "text": "Reply"},
-  {"speaker": "Spark", "text": "Funny comment"},
-  {"speaker": "Clara", "text": "Explanation"},
   ...
 ]
 
 Strict Rules:
+- Use **numeric formats** for all numbers, money, percentages, and rates (e.g. "$15,709", "8.74%", "7 years", "$100k", "35.24%"). Do NOT spell out numbers in words.
 - Ledger must start by clearly identifying the lender.
-- Have lively back-and-forth banter between the characters.
-- Make it entertaining and twice as long as normal responses.
-- Ledger MUST end with TWO final entries:
-  1. A single cohesive "Structured Summary" paragraph (no bullet points).
+- Have lively back-and-forth banter.
+- Ledger must end with TWO final entries:
+  1. A single cohesive "Structured Summary" paragraph (no bullets).
   2. One final "Offer Score" message.
 
-Example ending:
-  {"speaker": "Ledger", "text": "Structured Summary: This is a personal loan offer from SoFi with rates between 8.74% and 35.24%. Terms up to 7 years..."},
-  {"speaker": "Ledger", "text": "Offer Score: 6/10 - Decent option if you qualify for the low rate, but heavy on marketing hype."}
-
-Do NOT use bullet points or new lines inside any text field. Keep each text as one continuous paragraph.`;
+Keep responses natural, entertaining, and conversational.`;
 
     // Build vision payload
     const content: any[] = [{ 
