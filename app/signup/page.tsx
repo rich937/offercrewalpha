@@ -8,8 +8,8 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,44 +17,59 @@ export default function SignUp() {
       setError("Passwords don't match");
       return;
     }
+
     setLoading(true);
     setError('');
 
     try {
-      console.log('Sign up attempt for:', username, email);
-      // Placeholder - real Supabase auth will be added later
-      alert('Account created successfully! (placeholder)');
-      window.location.href = '/dashboard';
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { username }
+        }
+      });
+
+      if (authError) throw authError;
+
+      alert("Account created! You can now log in.");
+      window.location.href = '/login';
     } catch (err: any) {
-      setError(err.message || 'Sign up failed');
+      setError(err.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-10">
         <div className="text-center mb-10">
-          <img src="/logo.png" alt="OfferCrew" className="h-16 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold">Create Your Account</h1>
-          <p className="text-gray-600 mt-2">Join the OfferCrew</p>
+          <img src="/logo.png" alt="OfferCrew" className="h-12 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold">Join OfferCrew</h1>
         </div>
 
         <form onSubmit={handleSignUp} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-1.5">Username</label>
+            <label className="block text-sm font-medium mb-2">Username (screen name)</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              placeholder="richwalker"
+              placeholder="rich937"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5">Email</label>
+            <label className="block text-sm font-medium mb-2">Email</label>
             <input
               type="email"
               value={email}
@@ -66,7 +81,7 @@ export default function SignUp() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5">Password</label>
+            <label className="block text-sm font-medium mb-2">Password</label>
             <input
               type="password"
               value={password}
@@ -77,7 +92,7 @@ export default function SignUp() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5">Confirm Password</label>
+            <label className="block text-sm font-medium mb-2">Confirm Password</label>
             <input
               type="password"
               value={confirmPassword}
@@ -87,19 +102,22 @@ export default function SignUp() {
             />
           </div>
 
-          {error && <p className="text-red-600 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800 disabled:opacity-50"
           >
-            {loading ? 'Creating Account...' : 'Create Account'}
+            {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        <p className="text-center mt-8 text-sm text-gray-600">
-          Already have an account? <Link href="/login" className="text-cyan-600 hover:underline">Log in</Link>
+        <p className="text-center mt-6 text-gray-600">
+          Already have an account?{' '}
+          <Link href="/login" className="text-cyan-600 hover:underline font-medium">
+            Log in here
+          </Link>
         </p>
       </div>
     </div>
