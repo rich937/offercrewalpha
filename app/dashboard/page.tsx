@@ -77,11 +77,11 @@ export default function Dashboard() {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
       const images: File[] = [];
-      const numPages = Math.min(pdf.numPages, 4);
+      const numPages = Math.min(pdf.numPages, 4); // max 4 pages
 
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: 1.0 }); // lower scale for smaller size
 
         const canvas = document.createElement('canvas');
         canvas.height = viewport.height;
@@ -94,12 +94,15 @@ export default function Dashboard() {
           viewport: viewport
         }).promise;
 
+        // Very aggressive compression
         const blob = await new Promise<Blob | null>((resolve) => 
-          canvas.toBlob(resolve, 'image/jpeg', 0.82)
+          canvas.toBlob(resolve, 'image/jpeg', 0.65)  // lower quality
         );
 
         if (blob) {
-          images.push(new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
+          // Force resize if still large
+          const resized = await compressImage(new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
+          images.push(resized);
         }
       }
       return images;
@@ -109,18 +112,18 @@ export default function Dashboard() {
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       let files = Array.from(e.target.files).slice(0, 4);
       const processed: File[] = [];
 
       for (const file of files) {
-        if (file.type === 'application/pdf') {
-          const images = await convertPdfToImages(file);
-          processed.push(...images);
-        } else if (file.type.startsWith('image/')) {
+        if (file.type.startsWith('image/')) {
           const compressed = await compressImage(file);
           processed.push(compressed);
+        } else if (file.type === 'application/pdf') {
+          const pdfImages = await convertPdfToImages(file);
+          processed.push(...pdfImages);
         } else {
           processed.push(file);
         }
