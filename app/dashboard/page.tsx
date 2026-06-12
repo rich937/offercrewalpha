@@ -68,22 +68,25 @@ export default function Dashboard() {
     });
   };
 
-  const convertPdfToImages = async (file: File): Promise<File[]> => {
+   const convertPdfToImages = async (file: File): Promise<File[]> => {
     try {
       const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs`;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
       const images: File[] = [];
       const numPages = Math.min(pdf.numPages, 4);
 
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: 1.5 });
+
         const canvas = document.createElement('canvas');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
+
         const ctx = canvas.getContext('2d')!;
 
         await (page.render as any)({
@@ -91,7 +94,10 @@ export default function Dashboard() {
           viewport: viewport
         }).promise;
 
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        const blob = await new Promise<Blob | null>((resolve) => 
+          canvas.toBlob(resolve, 'image/jpeg', 0.82)
+        );
+
         if (blob) {
           images.push(new File([blob], `page-${i}.jpg`, { type: 'image/jpeg' }));
         }
