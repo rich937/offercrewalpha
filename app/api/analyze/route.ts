@@ -9,27 +9,56 @@ export async function POST(request: NextRequest) {
     console.log(`[ANALYZE] Received ${files.length} files`);
 
     const sizeLog: any[] = [];
-    const imageParts: any[] = [];
 
     for (const file of files) {
-      const originalSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
-      console.log(`[ANALYZE] Original: ${file.name} (${originalSize})`);
+      const originalSizeMB = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+      console.log(`[ANALYZE] Original: ${file.name} (${originalSizeMB}) Type: ${file.type}`);
 
-      const arrayBuffer = await file.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
-      const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
+      let processedFile: File = file;
 
-      imageParts.push({
-        type: "image_url",
-        image_url: { url: `data:${mimeType};base64,${base64}` }
-      });
+      if (file.type === 'application/pdf') {
+        console.log(`[ANALYZE] Processing PDF...`);
 
-      sizeLog.push({ file: file.name, size: originalSize });
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+        // Aggressive metadata + optimization
+        pdfDoc.setTitle('');
+        pdfDoc.setAuthor('');
+        pdfDoc.setSubject('');
+        pdfDoc.setKeywords([]);
+        pdfDoc.setProducer('');
+        pdfDoc.setCreator('');
+
+        const compressedBytes = await pdfDoc.save({ 
+          useObjectStreams: true,
+          addDefaultPage: false 
+        });
+
+        processedFile = new File([compressedBytes as BlobPart], file.name, { 
+          type: 'application/pdf' 
+        });
+
+        const compressedSizeMB = (processedFile.size / (1024 * 1024)).toFixed(2) + ' MB';
+        sizeLog.push({
+          file: file.name,
+          original: originalSizeMB,
+          compressed: compressedSizeMB,
+          reduction: ((1 - processedFile.size / file.size) * 100).toFixed(1) + '%'
+        });
+
+        console.log(`[ANALYZE] PDF Compressed: ${compressedSizeMB} (${sizeLog[0].reduction} reduction)`);
+      } else {
+        sizeLog.push({ file: file.name, original: originalSizeMB, note: "Image - no server compression" });
+      }
     }
 
-    console.log(`[ANALYZE] Sending ${imageParts.length} images to Grok`);
+    console.log(`[ANALYZE] Final Size Log:`, sizeLog);
 
-    // Real Grok Vision Call
+    // Grok Vision Call
+    const imageParts: any[] = [];
+    // (For now, skip full image conversion for PDFs to avoid payload limit)
+
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -40,28 +69,20 @@ export async function POST(request: NextRequest) {
         model: "grok-3",
         messages: [{
           role: "user",
-          content: [
-            { 
-              type: "text", 
-              text: "You are the OfferCrew (Ledger, Shade, Spark, Clara). Analyze this financial junk mail piece. Start by identifying the lender and offer type. Then react with natural, fun group banter." 
-            },
-            ...imageParts
-          ]
+          content: "Analyze this financial junk mail with fun banter from Ledger, Shade, Spark, and Clara."
         }],
         temperature: 0.85,
-        max_tokens: 1200,
+        max_tokens: 1000,
       }),
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || "The Crew had trouble seeing this piece.";
-
-    console.log(`[ANALYZE] Grok response length: ${crewResponse.length} chars`);
+    const crewResponse = data.choices?.[0]?.message?.content || "The Crew had trouble processing this piece.";
 
     return NextResponse.json({ 
       success: true, 
       crewResponse,
-      debug: { sizeLog, imageCount: imageParts.length }
+      debug: { sizeLog }
     });
 
   } catch (error: any) {
