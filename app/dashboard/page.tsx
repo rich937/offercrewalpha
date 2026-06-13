@@ -233,13 +233,14 @@ export default function Dashboard() {
 
       // Save to Supabase
       const supabase = getSupabase();
-      const { error: insertError } = await supabase.from('offers').insert({
+            const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
         sequence_number: Date.now(),
+        file_paths: [],           // can expand later
       });
-
+      
       if (insertError) console.error('Failed to save offer:', insertError);
 
       // Refresh history
