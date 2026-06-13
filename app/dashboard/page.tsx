@@ -169,31 +169,42 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // === ROBUST LENDER DETECTION ===
+            // === ROBUST LENDER DETECTION ===
       let detectedLender = 'Unknown Lender';
 
       try {
-        let rawResponse = result.crewResponse || "[]";
+        let rawResponse = result.crewResponse || "";
         const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
         if (jsonMatch) rawResponse = jsonMatch[0];
 
-        const parsed = JSON.parse(rawResponse);
-
-        if (Array.isArray(parsed)) {
-          for (const msg of parsed) {
-            const text = (msg.text || '').toLowerCase();
-            if (text.includes('credit ninja') || text.includes('credittninja')) {
-              detectedLender = 'Credit Ninja';
-              break;
+        // Try JSON first
+        try {
+          const parsed = JSON.parse(rawResponse);
+          if (Array.isArray(parsed)) {
+            for (const msg of parsed) {
+              const text = (msg.text || '').toLowerCase();
+              if (text.includes('credit ninja') || text.includes('credittninja')) {
+                detectedLender = 'Credit Ninja';
+                break;
+              }
+              if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
+              if (text.includes('citi')) { detectedLender = 'Citi'; break; }
+              if (text.includes('capital one')) { detectedLender = 'Capital One'; break; }
+              if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
+              if (text.includes('figure')) { detectedLender = 'Figure'; break; }
             }
-            if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
-            if (text.includes('citi')) { detectedLender = 'Citi'; break; }
-            if (text.includes('capital one') || text.includes('capitalone')) { detectedLender = 'Capital One'; break; }
-            if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
-            if (text.includes('figure')) { detectedLender = 'Figure'; break; }
-            if (text.includes('discover')) { detectedLender = 'Discover'; break; }
-            if (text.includes('chase')) { detectedLender = 'Chase'; break; }
           }
+        } catch {}
+
+        // Fallback: search full response text
+        if (detectedLender === 'Unknown Lender') {
+          const fullText = rawResponse.toLowerCase();
+          if (fullText.includes('credit ninja') || fullText.includes('credittninja')) detectedLender = 'Credit Ninja';
+          else if (fullText.includes('pnc')) detectedLender = 'PNC';
+          else if (fullText.includes('citi')) detectedLender = 'Citi';
+          else if (fullText.includes('capital one')) detectedLender = 'Capital One';
+          else if (fullText.includes('sofi')) detectedLender = 'SoFi';
+          else if (fullText.includes('figure')) detectedLender = 'Figure';
         }
       } catch (e) {
         console.error("Lender detection error", e);
