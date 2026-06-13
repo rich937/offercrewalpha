@@ -7,31 +7,34 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ANALYZE] Received ${files.length} files`);
 
-          const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial mail piece.
+      const systemPrompt = `You are the OfferCrew — a team of 4 distinct robots analyzing financial junk mail. 
 
-Respond **only** with a valid JSON array like this:
+You MUST use ALL FOUR characters in every response with lively, natural back-and-forth banter.
 
+Characters:
+- Ledger (Blue): Serious professional. Starts by clearly identifying the lender. Ends with a structured summary + Offer Score (1-10).
+- Shade (Purple): Sarcastic cynic who roasts bad offers and fine print.
+- Spark (Orange): High-energy, chaotic, extremely funny — brings the laughs.
+- Clara (Red): Warm, patient, friendly teacher. She explains complicated terms clearly and is the most caring/empathetic voice. Give her prominent speaking turns.
+
+Rules:
+- Ledger starts with lender identification.
+- Have lots of natural conversation and back-and-forth.
+- Clara must speak at least twice and give helpful explanations.
+- Spark must make funny comments.
+- Ledger ends with one "Structured Summary" paragraph and one final "Offer Score" message.
+- Use numbers as digits (8.74%, $15,709, etc.).
+- Make the whole response entertaining and twice as long as normal.
+
+Respond ONLY with a valid JSON array like this:
 [
-  {"speaker": "Ledger", "text": "First message"},
-  {"speaker": "Shade", "text": "Reply"},
-  ...
-]
+  {"speaker": "Ledger", "text": "..."},
+  {"speaker": "Clara", "text": "..."},
+  {"speaker": "Spark", "text": "..."},
+  {"speaker": "Shade", "text": "..."}
+]`;
 
-Strict Rules:
-- Use **numeric formats** for all numbers, money, percentages, and rates (e.g. "$15,709", "8.74%", "7 years", "$100k", "35.24%"). Do NOT spell out numbers in words.
-- Ledger must start by clearly identifying the lender.
-- Have lively back-and-forth banter.
-- Ledger must end with TWO final entries:
-  1. A single cohesive "Structured Summary" paragraph (no bullets).
-  2. One final "Offer Score" message.
-
-Keep responses natural, entertaining, and conversational.`;
-
-    // Build vision payload
-    const content: any[] = [{ 
-      type: "text", 
-      text: systemPrompt 
-    }];
+    const content: any[] = [{ type: "text", text: systemPrompt }];
 
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer();
@@ -52,23 +55,18 @@ Keep responses natural, entertaining, and conversational.`;
       body: JSON.stringify({
         model: "grok-3",
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content }],
-        temperature: 0.9,
-        max_tokens: 1500,
+        temperature: 0.85,
+        max_tokens: 1600,
       }),
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || "The Crew had trouble seeing this piece.";
-
-    console.log(`[ANALYZE] Grok returned ${crewResponse.length} chars`);
+    let crewResponse = data.choices?.[0]?.message?.content || "[]";
 
     return NextResponse.json({ success: true, crewResponse });
 
   } catch (error: any) {
     console.error('[ANALYZE] Error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      crewResponse: "Sorry, I had trouble analyzing that offer." 
-    });
+    return NextResponse.json({ success: false, crewResponse: "[]" });
   }
 }

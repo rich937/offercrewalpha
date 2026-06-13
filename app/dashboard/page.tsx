@@ -239,7 +239,6 @@ export default function Dashboard() {
 
       if (insertError) console.error('Failed to save offer:', insertError);
 
-      // Refresh history
       await loadHistory(user.id, supabase);
 
     } catch (err) {
