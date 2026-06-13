@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { event } from '../lib/gtag';
 
 let supabaseClient: any = null;
 
@@ -170,18 +169,8 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
+      // === SMART LENDER DETECTION FROM GROK ===
       let detectedLender = 'Unknown Lender';
-      const responseText = (result.crewResponse || '').toLowerCase();
-      if (responseText.includes('pnc')) detectedLender = 'PNC';
-      else if (responseText.includes('citi')) detectedLender = 'Citi';
-      else if (responseText.includes('capital one') || responseText.includes('capitalone')) detectedLender = 'Capital One';
-      else if (responseText.includes('figure')) detectedLender = 'Figure';
-      else if (responseText.includes('discover')) detectedLender = 'Discover';
-      else if (responseText.includes('chase')) detectedLender = 'Chase';
-      else if (responseText.includes('sofi')) detectedLender = 'SoFi';
-
-      // Strong JSON Parsing
-      let messagesToShow: any[] = [];
 
       try {
         let rawResponse = result.crewResponse || "[]";
@@ -191,43 +180,53 @@ export default function Dashboard() {
         const parsed = JSON.parse(rawResponse);
 
         if (Array.isArray(parsed)) {
+          // Look for lender in Ledger's messages
+          for (const msg of parsed) {
+            if (msg.speaker?.toLowerCase() === 'ledger' && msg.text) {
+              const text = msg.text.toLowerCase();
+              if (text.includes('credit ninja') || text.includes('credittninja')) detectedLender = 'Credit Ninja';
+              else if (text.includes('pnc')) detectedLender = 'PNC';
+              else if (text.includes('citi')) detectedLender = 'Citi';
+              else if (text.includes('capital one') || text.includes('capitalone')) detectedLender = 'Capital One';
+              else if (text.includes('sofi')) detectedLender = 'SoFi';
+              else if (text.includes('figure')) detectedLender = 'Figure';
+              else if (text.includes('discover')) detectedLender = 'Discover';
+              else if (text.includes('chase')) detectedLender = 'Chase';
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Lender detection error", e);
+      }
+
+      // Parse messages
+      let messagesToShow: any[] = [];
+      try {
+        let rawResponse = result.crewResponse || "[]";
+        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
+        if (jsonMatch) rawResponse = jsonMatch[0];
+
+        const parsed = JSON.parse(rawResponse);
+        if (Array.isArray(parsed)) {
           messagesToShow = parsed.map((item: any) => ({
-            type: (item.speaker || item.name || 'spark').toLowerCase(),
-            text: (item.text || item.message || String(item)).trim()
+            type: (item.speaker || 'spark').toLowerCase(),
+            text: (item.text || String(item)).trim()
           }));
         }
       } catch (e) {
-        console.error("JSON parse failed, using fallback", e);
-        const lines = (result.crewResponse || "").split('\n').filter((l: string) => l.trim().length > 3);
-        messagesToShow = lines.map((line: string) => {
-          let text = line.trim();
-          let type = 'spark';
-          const lower = line.toLowerCase();
-          if (lower.includes('ledger')) type = 'ledger';
-          else if (lower.includes('shade')) type = 'shade';
-          else if (lower.includes('clara')) type = 'clara';
-          else if (lower.includes('spark')) type = 'spark';
-
-          text = text.replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '');
-          return { type, text: text.trim() };
-        });
+        console.error("JSON parse failed", e);
       }
 
       // Final cleanup
       messagesToShow = messagesToShow
         .map(msg => ({
           ...msg,
-          text: msg.text
-            .replace(/^\s*\{.*\}\s*,?\s*$/g, '')
-            .replace(/^\s*\[\s*\{.*\}\s*\]\s*$/g, '')
-            .trim()
+          text: msg.text.replace(/^\s*\{.*\}\s*,?\s*$/g, '').trim()
         }))
         .filter(msg => msg.text.length > 5);
 
-      setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ 
-        type: 'system', 
-        text: result.crewResponse || "The Crew responded." 
-      }]);
+      setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
       // Save to Supabase
       const supabase = getSupabase();
