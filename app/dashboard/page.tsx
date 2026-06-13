@@ -102,11 +102,9 @@ export default function Dashboard() {
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: 1.0 });
-
         const canvas = document.createElement('canvas');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-
         const ctx = canvas.getContext('2d')!;
 
         await (page.render as any)({ canvasContext: ctx, viewport }).promise;
@@ -171,7 +169,6 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // Lender detection
       let detectedLender = 'Unknown Lender';
       const responseText = (result.crewResponse || '').toLowerCase();
       if (responseText.includes('pnc')) detectedLender = 'PNC';
@@ -233,14 +230,13 @@ export default function Dashboard() {
 
       // Save to Supabase
       const supabase = getSupabase();
-            const { error: insertError } = await supabase.from('offers').insert({
+      const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
         sequence_number: Date.now(),
-        file_paths: [],           // can expand later
       });
-      
+
       if (insertError) console.error('Failed to save offer:', insertError);
 
       // Refresh history
