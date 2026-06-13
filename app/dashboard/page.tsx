@@ -171,25 +171,21 @@ export default function Dashboard() {
 
       console.log("[DEBUG] Raw Grok Response:", result.crewResponse?.substring(0, 600));
 
-      // === EXTRACT LENDER FROM STRUCTURED JSON ===
+      // Robust Lender Detection
       let detectedLender = 'Unknown Lender';
-
       try {
-        let raw = result.crewResponse || "{}";
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        let raw = result.crewResponse || "";
+        const jsonMatch = raw.match(/\[[\s\S]*\]/);
         if (jsonMatch) raw = jsonMatch[0];
 
         const parsed = JSON.parse(raw);
-
-        // Direct lender field from Grok
-        if (parsed.lender) {
-          detectedLender = parsed.lender;
-        } 
-        // Fallback: search in messages
-        else if (parsed.messages && Array.isArray(parsed.messages)) {
-          for (const msg of parsed.messages) {
+        if (Array.isArray(parsed)) {
+          for (const msg of parsed) {
             const text = (msg.text || '').toLowerCase();
-            if (text.includes('credit ninja')) { detectedLender = 'Credit Ninja'; break; }
+            if (text.includes('credit ninja') || text.includes('credittninja')) {
+              detectedLender = 'Credit Ninja';
+              break;
+            }
             if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
             if (text.includes('citi')) { detectedLender = 'Citi'; break; }
             if (text.includes('capital one')) { detectedLender = 'Capital One'; break; }
@@ -198,10 +194,10 @@ export default function Dashboard() {
           }
         }
       } catch (e) {
-        console.error("Lender extraction error", e);
+        console.error("Lender detection error", e);
       }
 
-      console.log("[DEBUG] Final Detected Lender:", detectedLender);
+      console.log("[DEBUG] Final detected lender:", detectedLender);
 
       // Parse messages
       let messagesToShow: any[] = [];
@@ -218,12 +214,12 @@ export default function Dashboard() {
           }));
         }
       } catch (e) {
-        console.error("Message parsing failed", e);
+        console.error("Structured parse failed", e);
       }
 
-      // Fallback if no structured messages
+      // Fallback if needed
       if (messagesToShow.length === 0) {
-        const lines = (result.crewResponse || "").split('\n').filter(l => l.trim().length > 3);
+        const lines = (result.crewResponse || "").split('\n').filter((l: string) => l.trim().length > 3);
         messagesToShow = lines.map((line: string) => {
           let text = line.trim();
           let type = 'spark';
@@ -236,6 +232,14 @@ export default function Dashboard() {
           return { type, text: text.trim() };
         });
       }
+
+      // Final cleanup
+      messagesToShow = messagesToShow
+        .map(msg => ({
+          ...msg,
+          text: msg.text.replace(/^\s*\{.*\}\s*,?\s*$/g, '').trim()
+        }))
+        .filter(msg => msg.text.length > 5);
 
       setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
