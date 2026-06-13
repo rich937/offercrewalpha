@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import REFERENCE_GUIDE from '../../../lib/reference-guide';
+import REFERENCE_GUIDE from '../../lib/reference-guide';   // ← Fixed path
 
 export async function POST(request: NextRequest) {
   try {
