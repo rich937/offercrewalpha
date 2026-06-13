@@ -171,21 +171,22 @@ export default function Dashboard() {
 
       console.log("[DEBUG] Raw Grok Response:", result.crewResponse?.substring(0, 600));
 
-      // Robust Lender Detection
+      // Extract lender from structured JSON
       let detectedLender = 'Unknown Lender';
+
       try {
-        let raw = result.crewResponse || "";
-        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
         if (jsonMatch) raw = jsonMatch[0];
 
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          for (const msg of parsed) {
+
+        if (parsed.lender) {
+          detectedLender = parsed.lender;
+        } else if (parsed.messages && Array.isArray(parsed.messages)) {
+          for (const msg of parsed.messages) {
             const text = (msg.text || '').toLowerCase();
-            if (text.includes('credit ninja') || text.includes('credittninja')) {
-              detectedLender = 'Credit Ninja';
-              break;
-            }
+            if (text.includes('credit ninja')) { detectedLender = 'Credit Ninja'; break; }
             if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
             if (text.includes('citi')) { detectedLender = 'Citi'; break; }
             if (text.includes('capital one')) { detectedLender = 'Capital One'; break; }
@@ -194,7 +195,7 @@ export default function Dashboard() {
           }
         }
       } catch (e) {
-        console.error("Lender detection error", e);
+        console.error("Lender extraction error", e);
       }
 
       console.log("[DEBUG] Final detected lender:", detectedLender);
@@ -214,7 +215,7 @@ export default function Dashboard() {
           }));
         }
       } catch (e) {
-        console.error("Structured parse failed", e);
+        console.error("Message parsing failed", e);
       }
 
       // Fallback if needed
@@ -232,14 +233,6 @@ export default function Dashboard() {
           return { type, text: text.trim() };
         });
       }
-
-      // Final cleanup
-      messagesToShow = messagesToShow
-        .map(msg => ({
-          ...msg,
-          text: msg.text.replace(/^\s*\{.*\}\s*,?\s*$/g, '').trim()
-        }))
-        .filter(msg => msg.text.length > 5);
 
       setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
