@@ -3,6 +3,19 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+let supabaseClient: any = null;
+
+const getSupabase = () => {
+  if (!supabaseClient) {
+    const { createClient } = require('@supabase/supabase-js');
+    supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return supabaseClient;
+};
+
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -20,11 +33,7 @@ export default function Dashboard() {
   useEffect(() => {
     const init = async () => {
       try {
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        const supabase = getSupabase();
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         setUser(currentUser);
 
@@ -223,12 +232,7 @@ export default function Dashboard() {
       }]);
 
       // Save to Supabase
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-
+      const supabase = getSupabase();
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
