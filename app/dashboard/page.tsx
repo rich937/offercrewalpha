@@ -169,72 +169,84 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      console.log("[DEBUG] Raw Grok Response:", result.crewResponse?.substring(0, 800));
+      console.log("[DEBUG] Raw Grok Response:", result.crewResponse?.substring(0, 600));
 
-      // Robust Lender Detection
+      // === EXTRACT LENDER FROM STRUCTURED JSON ===
       let detectedLender = 'Unknown Lender';
+
       try {
-        let raw = result.crewResponse || "";
-        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
         if (jsonMatch) raw = jsonMatch[0];
 
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          for (const msg of parsed) {
+
+        // Direct lender field from Grok
+        if (parsed.lender) {
+          detectedLender = parsed.lender;
+        } 
+        // Fallback: search in messages
+        else if (parsed.messages && Array.isArray(parsed.messages)) {
+          for (const msg of parsed.messages) {
             const text = (msg.text || '').toLowerCase();
-            if (text.includes('credit ninja') || text.includes('credittninja')) {
-              detectedLender = 'Credit Ninja';
-              break;
-            }
+            if (text.includes('credit ninja')) { detectedLender = 'Credit Ninja'; break; }
             if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
             if (text.includes('citi')) { detectedLender = 'Citi'; break; }
-            if (text.includes('capital one') || text.includes('capitalone')) { detectedLender = 'Capital One'; break; }
+            if (text.includes('capital one')) { detectedLender = 'Capital One'; break; }
             if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
             if (text.includes('figure')) { detectedLender = 'Figure'; break; }
           }
         }
       } catch (e) {
-        console.error("Lender detection error", e);
+        console.error("Lender extraction error", e);
       }
 
-      console.log("[DEBUG] Final detected lender:", detectedLender);
+      console.log("[DEBUG] Final Detected Lender:", detectedLender);
 
       // Parse messages
       let messagesToShow: any[] = [];
       try {
-        let rawResponse = result.crewResponse || "[]";
-        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
-        if (jsonMatch) rawResponse = jsonMatch[0];
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) raw = jsonMatch[0];
+        const parsed = JSON.parse(raw);
 
-        const parsed = JSON.parse(rawResponse);
-        if (Array.isArray(parsed)) {
-          messagesToShow = parsed.map((item: any) => ({
+        if (parsed.messages && Array.isArray(parsed.messages)) {
+          messagesToShow = parsed.messages.map((item: any) => ({
             type: (item.speaker || 'spark').toLowerCase(),
             text: (item.text || String(item)).trim()
           }));
         }
       } catch (e) {
-        console.error("JSON parse failed", e);
+        console.error("Message parsing failed", e);
       }
 
-      // Cleanup
-      messagesToShow = messagesToShow
-        .map(msg => ({
-          ...msg,
-          text: msg.text.replace(/^\s*\{.*\}\s*,?\s*$/g, '').trim()
-        }))
-        .filter(msg => msg.text.length > 5);
+      // Fallback if no structured messages
+      if (messagesToShow.length === 0) {
+        const lines = (result.crewResponse || "").split('\n').filter(l => l.trim().length > 3);
+        messagesToShow = lines.map((line: string) => {
+          let text = line.trim();
+          let type = 'spark';
+          const lower = line.toLowerCase();
+          if (lower.includes('ledger')) type = 'ledger';
+          else if (lower.includes('shade')) type = 'shade';
+          else if (lower.includes('clara')) type = 'clara';
+          else if (lower.includes('spark')) type = 'spark';
+          text = text.replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '');
+          return { type, text: text.trim() };
+        });
+      }
 
       setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
-      // Save to Supabase with raw response for debugging
+      // Save to Supabase
       const supabase = getSupabase();
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
         sequence_number: Date.now(),
-        raw_grok_response: result.crewResponse,   // Full raw response saved
+        raw_grok_response: result.crewResponse,
       });
 
       if (insertError) console.error('Failed to save offer:', insertError);

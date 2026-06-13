@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import REFERENCE_GUIDE from '../../lib/reference-guide';   // ← Fixed path
+import REFERENCE_GUIDE from '../../lib/reference-guide';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,23 +8,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ANALYZE] Received ${files.length} files`);
 
-    const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial junk mail.
+    const systemPrompt = `You are the OfferCrew.
 
-${REFERENCE_GUIDE}
+First, perform OCR on the images and identify the exact lender name.
 
-Additional Instructions:
-- Always use all 4 characters with lively banter.
-- Clara should explain terms clearly and speak multiple times.
-- Spark should be very funny.
-- Ledger starts with lender identification and ends with structured summary + Offer Score.
-- Use real numbers ($15,709, 8.74%, etc.), not spelled out.
+Then respond **ONLY** with this exact JSON structure:
 
-Respond ONLY with a valid JSON array:
-[
-  {"speaker": "Ledger", "text": "message"},
-  {"speaker": "Clara", "text": "message"},
-  ...
-]`;
+{
+  "lender": "Exact Lender Name",
+  "messages": [
+    {"speaker": "Ledger", "text": "message"},
+    {"speaker": "Clara", "text": "message"},
+    {"speaker": "Spark", "text": "message"},
+    {"speaker": "Shade", "text": "message"}
+  ]
+}
+
+Rules:
+- "lender" must be the real company name from the mail (e.g. "CreditNinja", "PNC Bank", "SoFi Bank, N.A.").
+- Use all 4 characters with natural banter.
+- Ledger starts with lender identification.
+- Ledger ends with structured summary + Offer Score.
+- Use real numbers.
+- ${REFERENCE_GUIDE}`;
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
 
@@ -47,18 +53,18 @@ Respond ONLY with a valid JSON array:
       body: JSON.stringify({
         model: "grok-3",
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content }],
-        temperature: 0.85,
-        max_tokens: 1600,
+        temperature: 0.7,
+        max_tokens: 1800,
       }),
     });
 
     const data = await grokRes.json();
-    let crewResponse = data.choices?.[0]?.message?.content || "[]";
+    const crewResponse = data.choices?.[0]?.message?.content || "{}";
 
     return NextResponse.json({ success: true, crewResponse });
 
   } catch (error: any) {
     console.error('[ANALYZE] Error:', error);
-    return NextResponse.json({ success: false, crewResponse: "[]" });
+    return NextResponse.json({ success: false, crewResponse: "{}" });
   }
 }
