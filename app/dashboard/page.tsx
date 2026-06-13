@@ -169,7 +169,7 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // === IMPROVED LENDER DETECTION FROM GROK ===
+      // === ROBUST LENDER DETECTION ===
       let detectedLender = 'Unknown Lender';
 
       try {
@@ -180,7 +180,7 @@ export default function Dashboard() {
         const parsed = JSON.parse(rawResponse);
 
         if (Array.isArray(parsed)) {
-          for (const msg of parsed.slice(0, 8)) {
+          for (const msg of parsed) {
             const text = (msg.text || '').toLowerCase();
             if (text.includes('credit ninja') || text.includes('credittninja')) {
               detectedLender = 'Credit Ninja';
