@@ -169,7 +169,7 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // === SMART LENDER DETECTION FROM GROK ===
+      // === IMPROVED LENDER DETECTION FROM GROK ===
       let detectedLender = 'Unknown Lender';
 
       try {
@@ -180,27 +180,26 @@ export default function Dashboard() {
         const parsed = JSON.parse(rawResponse);
 
         if (Array.isArray(parsed)) {
-          // Look for lender in Ledger's messages
-          for (const msg of parsed) {
-            if (msg.speaker?.toLowerCase() === 'ledger' && msg.text) {
-              const text = msg.text.toLowerCase();
-              if (text.includes('credit ninja') || text.includes('credittninja')) detectedLender = 'Credit Ninja';
-              else if (text.includes('pnc')) detectedLender = 'PNC';
-              else if (text.includes('citi')) detectedLender = 'Citi';
-              else if (text.includes('capital one') || text.includes('capitalone')) detectedLender = 'Capital One';
-              else if (text.includes('sofi')) detectedLender = 'SoFi';
-              else if (text.includes('figure')) detectedLender = 'Figure';
-              else if (text.includes('discover')) detectedLender = 'Discover';
-              else if (text.includes('chase')) detectedLender = 'Chase';
+          for (const msg of parsed.slice(0, 8)) {
+            const text = (msg.text || '').toLowerCase();
+            if (text.includes('credit ninja') || text.includes('credittninja')) {
+              detectedLender = 'Credit Ninja';
               break;
             }
+            if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
+            if (text.includes('citi')) { detectedLender = 'Citi'; break; }
+            if (text.includes('capital one') || text.includes('capitalone')) { detectedLender = 'Capital One'; break; }
+            if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
+            if (text.includes('figure')) { detectedLender = 'Figure'; break; }
+            if (text.includes('discover')) { detectedLender = 'Discover'; break; }
+            if (text.includes('chase')) { detectedLender = 'Chase'; break; }
           }
         }
       } catch (e) {
         console.error("Lender detection error", e);
       }
 
-      // Parse messages
+      // Parse messages for display
       let messagesToShow: any[] = [];
       try {
         let rawResponse = result.crewResponse || "[]";
