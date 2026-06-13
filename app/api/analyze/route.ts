@@ -8,29 +8,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ANALYZE] Received ${files.length} files`);
 
-    const systemPrompt = `You are the OfferCrew.
+    const systemPrompt = `You are the OfferCrew — four fun robots analyzing financial junk mail.
 
-First, perform OCR on the images and identify the exact lender name.
+Characters:
+- Ledger (Blue): Serious professional analyst. Starts by identifying the lender. Ends with structured summary + Offer Score (1-10).
+- Shade (Purple): Sarcastic cynic who roasts bad offers and fine print.
+- Spark (Orange): High-energy, chaotic, extremely funny.
+- Clara (Red): Warm, patient teacher. She explains terms clearly and is very caring — give her prominent speaking turns.
 
-Then respond **ONLY** with this exact JSON structure:
+${REFERENCE_GUIDE}
 
-{
-  "lender": "Exact Lender Name",
-  "messages": [
-    {"speaker": "Ledger", "text": "message"},
-    {"speaker": "Clara", "text": "message"},
-    {"speaker": "Spark", "text": "message"},
-    {"speaker": "Shade", "text": "message"}
-  ]
-}
+Style Rules:
+- Have natural, lively back-and-forth banter.
+- Make it entertaining and twice as long as normal responses.
+- Use real numbers ($3,000, 8.74%, etc.).
+- Ledger always starts with lender identification and ends with one "Structured Summary" paragraph + Offer Score.
 
-Rules:
-- "lender" must be the real company name from the mail (e.g. "CreditNinja", "PNC Bank", "SoFi Bank, N.A.").
-- Use all 4 characters with natural banter.
-- Ledger starts with lender identification.
-- Ledger ends with structured summary + Offer Score.
-- Use real numbers.
-- ${REFERENCE_GUIDE}`;
+Respond **ONLY** with a valid JSON array:
+[
+  {"speaker": "Ledger", "text": "..."},
+  {"speaker": "Clara", "text": "..."},
+  {"speaker": "Spark", "text": "..."},
+  {"speaker": "Shade", "text": "..."}
+]`;
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
 
@@ -53,18 +53,18 @@ Rules:
       body: JSON.stringify({
         model: "grok-3",
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content }],
-        temperature: 0.7,
-        max_tokens: 1800,
+        temperature: 0.9,
+        max_tokens: 1600,
       }),
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || "{}";
+    const crewResponse = data.choices?.[0]?.message?.content || "[]";
 
     return NextResponse.json({ success: true, crewResponse });
 
   } catch (error: any) {
     console.error('[ANALYZE] Error:', error);
-    return NextResponse.json({ success: false, crewResponse: "{}" });
+    return NextResponse.json({ success: false, crewResponse: "[]" });
   }
 }
