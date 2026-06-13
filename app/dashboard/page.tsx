@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { event } from '../lib/gtag';
 
 let supabaseClient: any = null;
 
