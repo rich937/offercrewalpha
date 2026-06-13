@@ -169,48 +169,37 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-            // === ROBUST LENDER DETECTION ===
+      console.log("[DEBUG] Raw Grok Response:", result.crewResponse?.substring(0, 800));
+
+      // Robust Lender Detection
       let detectedLender = 'Unknown Lender';
-
       try {
-        let rawResponse = result.crewResponse || "";
-        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
-        if (jsonMatch) rawResponse = jsonMatch[0];
+        let raw = result.crewResponse || "";
+        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        if (jsonMatch) raw = jsonMatch[0];
 
-        // Try JSON first
-        try {
-          const parsed = JSON.parse(rawResponse);
-          if (Array.isArray(parsed)) {
-            for (const msg of parsed) {
-              const text = (msg.text || '').toLowerCase();
-              if (text.includes('credit ninja') || text.includes('credittninja')) {
-                detectedLender = 'Credit Ninja';
-                break;
-              }
-              if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
-              if (text.includes('citi')) { detectedLender = 'Citi'; break; }
-              if (text.includes('capital one')) { detectedLender = 'Capital One'; break; }
-              if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
-              if (text.includes('figure')) { detectedLender = 'Figure'; break; }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const msg of parsed) {
+            const text = (msg.text || '').toLowerCase();
+            if (text.includes('credit ninja') || text.includes('credittninja')) {
+              detectedLender = 'Credit Ninja';
+              break;
             }
+            if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
+            if (text.includes('citi')) { detectedLender = 'Citi'; break; }
+            if (text.includes('capital one') || text.includes('capitalone')) { detectedLender = 'Capital One'; break; }
+            if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
+            if (text.includes('figure')) { detectedLender = 'Figure'; break; }
           }
-        } catch {}
-
-        // Fallback: search full response text
-        if (detectedLender === 'Unknown Lender') {
-          const fullText = rawResponse.toLowerCase();
-          if (fullText.includes('credit ninja') || fullText.includes('credittninja')) detectedLender = 'Credit Ninja';
-          else if (fullText.includes('pnc')) detectedLender = 'PNC';
-          else if (fullText.includes('citi')) detectedLender = 'Citi';
-          else if (fullText.includes('capital one')) detectedLender = 'Capital One';
-          else if (fullText.includes('sofi')) detectedLender = 'SoFi';
-          else if (fullText.includes('figure')) detectedLender = 'Figure';
         }
       } catch (e) {
         console.error("Lender detection error", e);
       }
 
-      // Parse messages for display
+      console.log("[DEBUG] Final detected lender:", detectedLender);
+
+      // Parse messages
       let messagesToShow: any[] = [];
       try {
         let rawResponse = result.crewResponse || "[]";
@@ -228,7 +217,7 @@ export default function Dashboard() {
         console.error("JSON parse failed", e);
       }
 
-      // Final cleanup
+      // Cleanup
       messagesToShow = messagesToShow
         .map(msg => ({
           ...msg,
@@ -238,13 +227,14 @@ export default function Dashboard() {
 
       setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
-      // Save to Supabase
+      // Save to Supabase with raw response for debugging
       const supabase = getSupabase();
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
         sequence_number: Date.now(),
+        raw_grok_response: result.crewResponse,   // Full raw response saved
       });
 
       if (insertError) console.error('Failed to save offer:', insertError);
