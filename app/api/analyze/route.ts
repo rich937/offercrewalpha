@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import REFERENCE_GUIDE from '../../lib/reference-guide';
+import REFERENCE_GUIDE from '../../lib/reference-guide';   // ← Fixed path
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,28 +8,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ANALYZE] Received ${files.length} files`);
 
-    const systemPrompt = `You are the OfferCrew — four fun robots analyzing financial junk mail.
-
-Characters:
-- Ledger (Blue): Serious professional analyst. Starts by identifying the lender. Ends with structured summary + Offer Score (1-10).
-- Shade (Purple): Sarcastic cynic who roasts bad offers and fine print.
-- Spark (Orange): High-energy, chaotic, extremely funny.
-- Clara (Red): Warm, patient teacher. She explains terms clearly and is very caring — give her prominent speaking turns.
+    const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial junk mail.
 
 ${REFERENCE_GUIDE}
 
-Style Rules:
-- Have natural, lively back-and-forth banter.
-- Make it entertaining and twice as long as normal responses.
-- Use real numbers ($3,000, 8.74%, etc.).
-- Ledger always starts with lender identification and ends with one "Structured Summary" paragraph + Offer Score.
+Additional Instructions:
+- Always use all 4 characters with lively banter.
+- Clara should explain terms clearly and speak multiple times.
+- Spark should be very funny.
+- Ledger starts with lender identification and ends with structured summary + Offer Score.
+- Use real numbers ($15,709, 8.74%, etc.), not spelled out.
 
-Respond **ONLY** with a valid JSON array:
+Respond ONLY with a valid JSON array:
 [
-  {"speaker": "Ledger", "text": "..."},
-  {"speaker": "Clara", "text": "..."},
-  {"speaker": "Spark", "text": "..."},
-  {"speaker": "Shade", "text": "..."}
+  {"speaker": "Ledger", "text": "message"},
+  {"speaker": "Clara", "text": "message"},
+  ...
 ]`;
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
@@ -53,13 +47,13 @@ Respond **ONLY** with a valid JSON array:
       body: JSON.stringify({
         model: "grok-3",
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content }],
-        temperature: 0.9,
+        temperature: 0.85,
         max_tokens: 1600,
       }),
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || "[]";
+    let crewResponse = data.choices?.[0]?.message?.content || "[]";
 
     return NextResponse.json({ success: true, crewResponse });
 
