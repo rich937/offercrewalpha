@@ -300,8 +300,7 @@ export default function Dashboard() {
         return;
       }
 
-      // Re-run analysis using the existing function
-      await analyzeWithCrew(processedFiles);   // Note: this may need small adjustment if analyzeWithCrew expects selectedFiles
+      await analyzeWithCrew(processedFiles);
 
     } catch (err) {
       console.error(err);
