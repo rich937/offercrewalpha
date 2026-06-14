@@ -156,9 +156,8 @@ export default function Dashboard() {
 
   const getUserInitial = () => (user?.email || 'U').charAt(0).toUpperCase();
 
-  const analyzeWithCrew = async () => {
+    const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0 || !user) return;
-
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} file(s)...` }]);
 
@@ -169,76 +168,48 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-            // === ROBUST LENDER DETECTION ===
+      // === NEW STRUCTURED JSON PARSING ===
       let detectedLender = 'Unknown Lender';
-
-      try {
-        let rawResponse = result.crewResponse || "";
-        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
-        if (jsonMatch) rawResponse = jsonMatch[0];
-
-        // Try JSON first
-        try {
-          const parsed = JSON.parse(rawResponse);
-          if (Array.isArray(parsed)) {
-            for (const msg of parsed) {
-              const text = (msg.text || '').toLowerCase();
-              if (text.includes('credit ninja') || text.includes('credittninja')) {
-                detectedLender = 'Credit Ninja';
-                break;
-              }
-              if (text.includes('pnc')) { detectedLender = 'PNC'; break; }
-              if (text.includes('citi')) { detectedLender = 'Citi'; break; }
-              if (text.includes('capital one')) { detectedLender = 'Capital One'; break; }
-              if (text.includes('sofi')) { detectedLender = 'SoFi'; break; }
-              if (text.includes('figure')) { detectedLender = 'Figure'; break; }
-            }
-          }
-        } catch {}
-
-        // Fallback: search full response text
-        if (detectedLender === 'Unknown Lender') {
-          const fullText = rawResponse.toLowerCase();
-          if (fullText.includes('credit ninja') || fullText.includes('credittninja')) detectedLender = 'Credit Ninja';
-          else if (fullText.includes('pnc')) detectedLender = 'PNC';
-          else if (fullText.includes('citi')) detectedLender = 'Citi';
-          else if (fullText.includes('capital one')) detectedLender = 'Capital One';
-          else if (fullText.includes('sofi')) detectedLender = 'SoFi';
-          else if (fullText.includes('figure')) detectedLender = 'Figure';
-        }
-      } catch (e) {
-        console.error("Lender detection error", e);
-      }
-
-      // Parse messages for display
       let messagesToShow: any[] = [];
-      try {
-        let rawResponse = result.crewResponse || "[]";
-        const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);
-        if (jsonMatch) rawResponse = jsonMatch[0];
 
-        const parsed = JSON.parse(rawResponse);
-        if (Array.isArray(parsed)) {
-          messagesToShow = parsed.map((item: any) => ({
+      try {
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) raw = jsonMatch[0];
+
+        const parsed = JSON.parse(raw);
+
+        // Extract lender from top-level field
+        if (parsed.lender && typeof parsed.lender === 'string') {
+          detectedLender = parsed.lender.trim();
+        }
+
+        // Extract messages
+        if (Array.isArray(parsed.messages)) {
+          messagesToShow = parsed.messages.map((item: any) => ({
             type: (item.speaker || 'spark').toLowerCase(),
             text: (item.text || String(item)).trim()
           }));
         }
       } catch (e) {
-        console.error("JSON parse failed", e);
+        console.warn("Structured JSON parse failed, falling back...", e);
+        // Fallback for safety
+        messagesToShow = [{ type: 'spark', text: result.crewResponse || "The Crew responded." }];
       }
 
       // Final cleanup
       messagesToShow = messagesToShow
         .map(msg => ({
           ...msg,
-          text: msg.text.replace(/^\s*\{.*\}\s*,?\s*$/g, '').trim()
+          text: msg.text
+            .replace(/^\s*\{.*\}\s*$/g, '')
+            .trim()
         }))
-        .filter(msg => msg.text.length > 5);
+        .filter(msg => msg.text.length > 3);
 
-      setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
+      setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: "The Crew responded." }]);
 
-      // Save to Supabase
+      // Save to Supabase with clean lender name
       const supabase = getSupabase();
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
@@ -248,8 +219,7 @@ export default function Dashboard() {
       });
 
       if (insertError) console.error('Failed to save offer:', insertError);
-
-      await loadHistory(user.id, supabase);
+      else await loadHistory(user.id, supabase);
 
     } catch (err) {
       console.error(err);
@@ -407,11 +377,11 @@ export default function Dashboard() {
                 <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
               )}
               {history.map((offer, i) => (
-                <div key={i} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all">
-                  <p className="font-semibold text-lg">{offer.lender}</p>
-                  <p className="text-sm text-gray-500">#{String(offer.sequence_number || i+1).padStart(6, '0')}</p>
-                  <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
-                </div>
+              <div key={i} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all">
+  <p className="font-semibold text-lg">{offer.lender}</p>
+  <p className="text-sm text-gray-500">#{String(offer.sequence_number || i+1).padStart(6, '0')}</p>
+  <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
+</div>
               ))}
             </div>
           </div>
