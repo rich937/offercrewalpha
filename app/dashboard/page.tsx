@@ -156,22 +156,23 @@ export default function Dashboard() {
 
   const getUserInitial = () => (user?.email || 'U').charAt(0).toUpperCase();
 
-    const analyzeWithCrew = async () => {
-    if (selectedFiles.length === 0 || !user) return;
+    const analyzeWithCrew = async (filesToUse?: File[]) => {
+    const files = filesToUse || selectedFiles;
+    if (files.length === 0 || !user) return;
+
     setUploading(true);
-    setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} file(s)...` }]);
+    setChatMessages([{ type: 'system', text: `Analyzing ${files.length} file(s)...` }]);
 
     try {
       const formData = new FormData();
-      selectedFiles.forEach(f => formData.append('files', f));
+      files.forEach(f => formData.append('files', f));
 
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-           // === ENHANCED STRUCTURED JSON PARSING ===
+      // === STRUCTURED JSON PARSING ===
       let detectedLender = 'Unknown Lender';
       let messagesToShow: any[] = [];
-      let offerMetadata: any = {};
 
       try {
         let raw = result.crewResponse || "{}";
@@ -188,18 +189,6 @@ export default function Dashboard() {
             text: (item.text || String(item)).trim()
           }));
         }
-
-        // Save extra metadata for future use
-        offerMetadata = {
-          product_type: parsed.product_type || null,
-          max_amount: parsed.max_amount || null,
-          intro_rate: parsed.intro_rate || null,
-          apr: parsed.apr || null,
-          fees: parsed.fees || null,
-          url: parsed.url || null,
-          qr_codes: parsed.qr_codes || [],
-        };
-
       } catch (e) {
         console.warn("JSON parse failed", e);
       }
@@ -210,46 +199,31 @@ export default function Dashboard() {
 
       setChatMessages(cleanedMessages.length > 0 ? cleanedMessages : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
-      // === STORE IMAGES WITH CLEAN FOLDER STRUCTURE ===
+      // === STORE IMAGES ===
       const supabase = getSupabase();
       const filePaths: string[] = [];
       const offerFolder = `${detectedLender.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
 
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const fileExt = file.name.split('.').pop() || 'jpg';
         const fileName = `${user.id}/${offerFolder}/page-${i}.${fileExt}`;
 
         const { error } = await supabase.storage
           .from('mail-pieces')
-          .upload(fileName, file, { 
-            upsert: true,
-            contentType: file.type 
-          });
+          .upload(fileName, file, { upsert: true, contentType: file.type });
 
-        if (error) {
-          console.error('Storage upload error:', error);
-        } else {
-          filePaths.push(fileName);
-        }
+        if (!error) filePaths.push(fileName);
       }
 
-            // === SAVE TO OFFERS TABLE ===
+      // === SAVE TO OFFERS TABLE ===
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
-        file_count: selectedFiles.length,
+        file_count: files.length,
         file_paths: filePaths,
         sequence_number: Date.now(),
         raw_grok_response: result.crewResponse,
-        // New structured metadata
-        product_type: offerMetadata.product_type,
-        max_amount: offerMetadata.max_amount,
-        intro_rate: offerMetadata.intro_rate,
-        apr: offerMetadata.apr,
-        fees: offerMetadata.fees,
-        url: offerMetadata.url,
-        qr_codes: offerMetadata.qr_codes,
       });
 
       if (insertError) console.error('Failed to save offer:', insertError);
@@ -260,10 +234,11 @@ export default function Dashboard() {
       setChatMessages([{ type: 'system', text: "Sorry, I had trouble analyzing that offer." }]);
     }
 
-    setSelectedFiles([]);
     setUploading(false);
   };
 
+
+  
    const sendUserMessage = async () => {
     if (!userInput.trim() || isResponding) return;
 
@@ -290,6 +265,52 @@ export default function Dashboard() {
           recentOfferContext: offerContext 
         })
       });
+
+  const reAnalyzeOffer = async (offer: any) => {
+    if (!offer.file_paths || offer.file_paths.length === 0) {
+      setChatMessages([{ type: 'system', text: "No images found for this offer." }]);
+      return;
+    }
+
+    setUploading(true);
+    setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.lender} offer...` }]);
+
+    try {
+      const supabase = getSupabase();
+      const processedFiles: File[] = [];
+
+      for (const path of offer.file_paths) {
+        const { data, error } = await supabase.storage
+          .from('mail-pieces')
+          .download(path);
+
+        if (error) {
+          console.error('Download error:', error);
+          continue;
+        }
+
+        const file = new File([data], path.split('/').pop() || 'image.jpg', { 
+          type: 'image/jpeg' 
+        });
+        processedFiles.push(file);
+      }
+
+      if (processedFiles.length === 0) {
+        setChatMessages([{ type: 'system', text: "Could not load images for this offer." }]);
+        return;
+      }
+
+      // Re-run analysis using the existing function
+      await analyzeWithCrew(processedFiles);   // Note: this may need small adjustment if analyzeWithCrew expects selectedFiles
+
+    } catch (err) {
+      console.error(err);
+      setChatMessages([{ type: 'system', text: "Sorry, could not re-analyze this offer." }]);
+    } finally {
+      setUploading(false);
+    }
+  };
+      
 
       const data = await res.json();
 
@@ -367,10 +388,10 @@ export default function Dashboard() {
               📤 Select Photos or PDF (max 4)
             </button>
 
-            {selectedFiles.length > 0 && (
-              <button 
-                onClick={analyzeWithCrew} 
-                disabled={uploading} 
+                        {selectedFiles.length > 0 && (
+              <button
+                onClick={() => analyzeWithCrew()}   // ← Fixed: call with empty parentheses
+                disabled={uploading}
                 className="mt-6 w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
                 {uploading ? 'Analyzing...' : 'Send to the Crew →'}
