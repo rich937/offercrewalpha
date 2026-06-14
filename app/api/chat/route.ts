@@ -5,26 +5,28 @@ export async function POST(request: NextRequest) {
   try {
     const { message, recentOfferContext } = await request.json();
 
-    const systemPrompt = `You are the OfferCrew. The user just asked: "${message}"
+    const systemPrompt = `You are the OfferCrew. The user asked: "${message}"
 
-Use this context from the most recent offer:
+Recent Offer Context:
 ${recentOfferContext || "No recent offer loaded."}
 
 ${REFERENCE_GUIDE}
 
 Response Rules:
-- Start with Clara saying something like "One sec..." or "Let me think about that..."
-- Then have natural group banter answering the question using details from the offer.
-- If the offer doesn't have enough info, have Ledger say: "Sorry, the offer doesn't give us enough detail to answer that."
-- Keep it fun, with Spark being funny and Shade sarcastic.
-- End with Ledger if needed.
+- Clara starts with a short "One sec..." or "Let me check that..." ONLY ONCE.
+- Then have natural, lively banter answering the question using details from the offer.
+- Be specific. If the offer clearly states something (like max loan amount), use that exact information.
+- If the offer doesn't have enough detail, Ledger says: "Sorry, the offer doesn't give us enough detail to answer that."
+- Keep it fun with Spark jokes and Shade roasts.
+- All 4 characters should participate.
 
-Respond **ONLY** with valid JSON array:
+Respond **ONLY** with a valid JSON array like:
 [
   {"speaker": "Clara", "text": "One sec..."},
-  {"speaker": "...", "text": "..."},
+  {"speaker": "Ledger", "text": "..."},
   ...
 ]`;
+
 
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',

@@ -239,9 +239,8 @@ export default function Dashboard() {
     setUserInput('');
     setIsResponding(true);
 
-    // Add Clara's "One sec..." immediately
+        // Add Clara's "One sec..." only once
     setChatMessages(prev => [...prev, { type: 'clara', text: "One sec..." }]);
-
     try {
       // Get the most recent offer for context
       const recentOffer = history.length > 0 ? history[0] : null;
