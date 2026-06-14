@@ -1,30 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import REFERENCE_GUIDE from '../../lib/reference-guide';   // ← Fixed path
+import REFERENCE_GUIDE from '../../lib/reference-guide';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
-    console.log(`[ANALYZE] Received ${files.length} files`);
-
-    const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial junk mail.
+    const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial mail piece.
 
 ${REFERENCE_GUIDE}
 
-Additional Instructions:
-- Always use all 4 characters with lively banter.
-- Clara should explain terms clearly and speak multiple times.
-- Spark should be very funny.
-- Ledger starts with lender identification and ends with structured summary + Offer Score.
-- Use real numbers ($15,709, 8.74%, etc.), not spelled out.
+MANDATORY RESPONSE FORMAT:
+Respond **ONLY** with valid JSON in this exact structure:
+{
+  "lender": "Exact Lender Name here",
+  "messages": [
+    {"speaker": "Ledger", "text": "..."},
+    {"speaker": "Clara", "text": "..."},
+    {"speaker": "Spark", "text": "..."},
+    {"speaker": "Shade", "text": "..."}
+  ]
+}
 
-Respond ONLY with a valid JSON array:
-[
-  {"speaker": "Ledger", "text": "message"},
-  {"speaker": "Clara", "text": "message"},
-  ...
-]`;
+Rules:
+- "lender" must be the real company name (e.g. "CreditNinja", "SoFi", "PNC", "Figure", "Capital One").
+- Ledger always starts by identifying the lender.
+- Have natural banter with all 4 characters.
+- Ledger ends with a structured summary and Offer Score.
+- Use real numbers, not spelled out.`;
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
 
@@ -46,19 +49,22 @@ Respond ONLY with a valid JSON array:
       },
       body: JSON.stringify({
         model: "grok-3",
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content }],
+        messages: [{ role: "user", content }],
         temperature: 0.85,
-        max_tokens: 1600,
+        max_tokens: 1400,
       }),
     });
 
     const data = await grokRes.json();
-    let crewResponse = data.choices?.[0]?.message?.content || "[]";
+    const crewResponse = data.choices?.[0]?.message?.content || '{"lender":"Unknown Lender","messages":[]}';
 
     return NextResponse.json({ success: true, crewResponse });
 
   } catch (error: any) {
     console.error('[ANALYZE] Error:', error);
-    return NextResponse.json({ success: false, crewResponse: "[]" });
+    return NextResponse.json({ 
+      success: false, 
+      crewResponse: '{"lender":"Unknown Lender","messages":[{"speaker":"Spark","text":"Sorry, I had trouble analyzing that piece."}]}' 
+    });
   }
 }
