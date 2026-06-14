@@ -5,27 +5,21 @@ export async function POST(request: NextRequest) {
   try {
     const { message, recentOfferContext } = await request.json();
 
-    const systemPrompt = `You are the OfferCrew. The user asked: "${message}"
+     const systemPrompt = `You are the OfferCrew. The user just asked: "${message}"
 
-Recent Offer Context:
-${recentOfferContext || "No recent offer loaded."}
+Here is the full context from the MOST RECENT uploaded offer:
+${recentOfferContext || "No recent offer available."}
 
 ${REFERENCE_GUIDE}
 
-Response Rules:
-- Clara starts with a short "One sec..." or "Let me check that..." ONLY ONCE.
-- Then have natural, lively banter answering the question using details from the offer.
-- Be specific. If the offer clearly states something (like max loan amount), use that exact information.
-- If the offer doesn't have enough detail, Ledger says: "Sorry, the offer doesn't give us enough detail to answer that."
-- Keep it fun with Spark jokes and Shade roasts.
-- All 4 characters should participate.
+Important:
+- Always use the details from the most recent offer to answer.
+- If the offer clearly states something (e.g. max loan amount is $3,000), use that exact information.
+- Clara starts with one short "One sec..." or "Let me check the offer...".
+- Then have natural banter.
+- If truly not enough info, Ledger can say so — but only as last resort.
 
-Respond **ONLY** with a valid JSON array like:
-[
-  {"speaker": "Clara", "text": "One sec..."},
-  {"speaker": "Ledger", "text": "..."},
-  ...
-]`;
+Respond **ONLY** with a valid JSON array.`;
 
 
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
