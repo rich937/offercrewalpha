@@ -156,7 +156,7 @@ export default function Dashboard() {
 
   const getUserInitial = () => (user?.email || 'U').charAt(0).toUpperCase();
 
-     const analyzeWithCrew = async () => {
+    const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0 || !user) return;
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} file(s)...` }]);
@@ -168,7 +168,7 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // === STRUCTURED JSON PARSING + LENDER EXTRACTION ===
+      // Parse JSON for lender and messages
       let detectedLender = 'Unknown Lender';
       let messagesToShow: any[] = [];
 
@@ -179,12 +179,8 @@ export default function Dashboard() {
 
         const parsed = JSON.parse(raw);
 
-        // Extract lender from JSON
-        if (parsed.lender && typeof parsed.lender === 'string') {
-          detectedLender = parsed.lender.trim();
-        }
+        if (parsed.lender) detectedLender = parsed.lender.trim();
 
-        // Extract messages for display
         if (Array.isArray(parsed.messages)) {
           messagesToShow = parsed.messages.map((item: any) => ({
             type: (item.speaker || 'spark').toLowerCase(),
@@ -195,22 +191,21 @@ export default function Dashboard() {
         console.warn("JSON parse failed", e);
       }
 
-      // Final cleanup
       const cleanedMessages = messagesToShow
         .map(msg => ({ ...msg, text: msg.text.trim() }))
         .filter(msg => msg.text.length > 5);
 
       setChatMessages(cleanedMessages.length > 0 ? cleanedMessages : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
-      // === STORE IMAGES IN SUPABASE (mail-pieces bucket) ===
+      // === STORE IMAGES WITH CLEAN FOLDER STRUCTURE ===
       const supabase = getSupabase();
       const filePaths: string[] = [];
+      const offerFolder = `${detectedLender.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
 
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         const fileExt = file.name.split('.').pop() || 'jpg';
-        const timestamp = Date.now();
-        const fileName = `${user.id}/${timestamp}-${i}.${fileExt}`;
+        const fileName = `${user.id}/${offerFolder}/page-${i}.${fileExt}`;
 
         const { error } = await supabase.storage
           .from('mail-pieces')
@@ -226,7 +221,7 @@ export default function Dashboard() {
         }
       }
 
-      // === SAVE TO OFFERS TABLE (with lender + file paths) ===
+      // Save offer record
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
