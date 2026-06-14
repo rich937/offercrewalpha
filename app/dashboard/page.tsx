@@ -156,7 +156,7 @@ export default function Dashboard() {
 
   const getUserInitial = () => (user?.email || 'U').charAt(0).toUpperCase();
 
-    const analyzeWithCrew = async () => {
+     const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0 || !user) return;
     setUploading(true);
     setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} file(s)...` }]);
@@ -168,7 +168,7 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // === NEW STRUCTURED JSON PARSING ===
+      // === STRUCTURED JSON PARSING + LENDER EXTRACTION ===
       let detectedLender = 'Unknown Lender';
       let messagesToShow: any[] = [];
 
@@ -179,12 +179,12 @@ export default function Dashboard() {
 
         const parsed = JSON.parse(raw);
 
-        // Extract lender from top-level field
+        // Extract lender from JSON
         if (parsed.lender && typeof parsed.lender === 'string') {
           detectedLender = parsed.lender.trim();
         }
 
-        // Extract messages
+        // Extract messages for display
         if (Array.isArray(parsed.messages)) {
           messagesToShow = parsed.messages.map((item: any) => ({
             type: (item.speaker || 'spark').toLowerCase(),
@@ -192,29 +192,46 @@ export default function Dashboard() {
           }));
         }
       } catch (e) {
-        console.warn("Structured JSON parse failed, falling back...", e);
-        // Fallback for safety
-        messagesToShow = [{ type: 'spark', text: result.crewResponse || "The Crew responded." }];
+        console.warn("JSON parse failed", e);
       }
 
       // Final cleanup
-      messagesToShow = messagesToShow
-        .map(msg => ({
-          ...msg,
-          text: msg.text
-            .replace(/^\s*\{.*\}\s*$/g, '')
-            .trim()
-        }))
-        .filter(msg => msg.text.length > 3);
+      const cleanedMessages = messagesToShow
+        .map(msg => ({ ...msg, text: msg.text.trim() }))
+        .filter(msg => msg.text.length > 5);
 
-      setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: "The Crew responded." }]);
+      setChatMessages(cleanedMessages.length > 0 ? cleanedMessages : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
-      // Save to Supabase with clean lender name
+      // === STORE IMAGES IN SUPABASE (mail-pieces bucket) ===
       const supabase = getSupabase();
+      const filePaths: string[] = [];
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const timestamp = Date.now();
+        const fileName = `${user.id}/${timestamp}-${i}.${fileExt}`;
+
+        const { error } = await supabase.storage
+          .from('mail-pieces')
+          .upload(fileName, file, { 
+            upsert: true,
+            contentType: file.type 
+          });
+
+        if (error) {
+          console.error('Storage upload error:', error);
+        } else {
+          filePaths.push(fileName);
+        }
+      }
+
+      // === SAVE TO OFFERS TABLE (with lender + file paths) ===
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
+        file_paths: filePaths,
         sequence_number: Date.now(),
       });
 
