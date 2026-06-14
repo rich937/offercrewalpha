@@ -230,33 +230,65 @@ export default function Dashboard() {
     setUploading(false);
   };
 
-  const sendUserMessage = async () => {
+   const sendUserMessage = async () => {
     if (!userInput.trim() || isResponding) return;
-    const username = user?.email?.split('@')[0] || 'You';
-    setChatMessages(prev => [...prev, { type: 'user', text: userInput, username }]);
 
-    const question = userInput;
+    const username = user?.email?.split('@')[0] || 'You';
+    const question = userInput.trim();
+    setChatMessages(prev => [...prev, { type: 'user', text: question, username }]);
     setUserInput('');
     setIsResponding(true);
 
+    // Add Clara's "One sec..." immediately
+    setChatMessages(prev => [...prev, { type: 'clara', text: "One sec..." }]);
+
     try {
+      // Get the most recent offer for context
+      const recentOffer = history.length > 0 ? history[0] : null;
+      const offerContext = recentOffer 
+        ? `Lender: ${recentOffer.lender}. Previous analysis: ${JSON.stringify(recentOffer)}`
+        : "No recent offer loaded.";
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: question })
+        body: JSON.stringify({ 
+          message: question,
+          recentOfferContext: offerContext 
+        })
       });
+
       const data = await res.json();
+
       if (data.crewResponse) {
-        const lines = data.crewResponse.split('\n').filter((l: string) => l.trim());
-        const crewMsgs = lines.map((line: string) => ({
-          type: 'spark',
-          text: line.trim().replace(/^(Ledger|Shade|Spark|Clara):\s*/i, '')
-        }));
-        setChatMessages(prev => [...prev, ...crewMsgs]);
+        let messagesToShow: any[] = [];
+        try {
+          const jsonMatch = data.crewResponse.match(/\[[\s\S]*\]/);
+          const jsonStr = jsonMatch ? jsonMatch[0] : data.crewResponse;
+          const parsed = JSON.parse(jsonStr);
+          if (Array.isArray(parsed)) {
+            messagesToShow = parsed.map((item: any) => ({
+              type: (item.speaker || 'spark').toLowerCase(),
+              text: (item.text || String(item)).trim()
+            }));
+          }
+        } catch (e) {
+          console.warn("Chat JSON parse failed");
+        }
+
+        const cleaned = messagesToShow.filter(m => m.text.length > 3);
+        if (cleaned.length > 0) {
+          setChatMessages(prev => [...prev, ...cleaned]);
+        }
       }
     } catch (err) {
-      setChatMessages(prev => [...prev, { type: 'clara', text: "Sorry, I'm having trouble responding right now." }]);
+      console.error(err);
+      setChatMessages(prev => [...prev, { 
+        type: 'ledger', 
+        text: "Sorry, the offer doesn't give us enough detail to answer that." 
+      }]);
     }
+
     setIsResponding(false);
   };
 
