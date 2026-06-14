@@ -6,14 +6,21 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
-      const systemPrompt = `You are the OfferCrew — four fun, lively robots (Ledger, Shade, Spark, Clara) reacting to financial junk mail.
+         const systemPrompt = `You are the OfferCrew. Analyze the uploaded financial mail piece.
 
 ${REFERENCE_GUIDE}
 
-MANDATORY RESPONSE FORMAT:
-Respond **ONLY** with valid JSON:
+MANDATORY RESPONSE FORMAT — Respond **ONLY** with this exact JSON structure:
+
 {
   "lender": "Exact Lender Name",
+  "product_type": "Personal Loan | Credit Card | HELOC | Balance Transfer | etc.",
+  "max_amount": number or null,
+  "intro_rate": string or null,
+  "apr": string or null,
+  "fees": string or null,
+  "url": string or null,
+  "qr_codes": ["any extracted QR code text or URL"],
   "messages": [
     {"speaker": "Ledger", "text": "..."},
     {"speaker": "Clara", "text": "..."},
@@ -22,15 +29,13 @@ Respond **ONLY** with valid JSON:
   ]
 }
 
-Banter Rules (Very Important):
-- Make it feel like a lively group chat with lots of natural back-and-forth.
-- Spark should be chaotic and extremely funny.
-- Shade should roast the offer and call out tricks.
-- Clara should explain terms warmly and clearly (give her multiple turns).
-- Ledger starts by identifying the lender and ends with a structured summary + Offer Score.
-- Aim for **much more banter** — at least 8-12 exchanges total. Keep responses entertaining and twice as long as normal.
-- Use real numbers ($3,000, 8.74%, etc.).
-- Natural interruptions, reactions, and jokes between characters.`;
+Rules:
+- Extract as much structured data as possible from the images.
+- If a URL or application link is visible, put it in "url".
+- If QR codes are present, try to describe or extract the destination URL/text.
+- Have lively banter with all 4 characters.
+- Ledger starts by identifying the lender and ends with structured summary + Offer Score.
+- Use real numbers.`;
 
 
     const content: any[] = [{ type: "text", text: systemPrompt }];

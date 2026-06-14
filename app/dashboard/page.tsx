@@ -168,9 +168,10 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // Parse JSON for lender and messages
+           // === ENHANCED STRUCTURED JSON PARSING ===
       let detectedLender = 'Unknown Lender';
       let messagesToShow: any[] = [];
+      let offerMetadata: any = {};
 
       try {
         let raw = result.crewResponse || "{}";
@@ -187,6 +188,18 @@ export default function Dashboard() {
             text: (item.text || String(item)).trim()
           }));
         }
+
+        // Save extra metadata for future use
+        offerMetadata = {
+          product_type: parsed.product_type || null,
+          max_amount: parsed.max_amount || null,
+          intro_rate: parsed.intro_rate || null,
+          apr: parsed.apr || null,
+          fees: parsed.fees || null,
+          url: parsed.url || null,
+          qr_codes: parsed.qr_codes || [],
+        };
+
       } catch (e) {
         console.warn("JSON parse failed", e);
       }
@@ -221,13 +234,22 @@ export default function Dashboard() {
         }
       }
 
-      // Save offer record
+            // === SAVE TO OFFERS TABLE ===
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: selectedFiles.length,
         file_paths: filePaths,
         sequence_number: Date.now(),
+        raw_grok_response: result.crewResponse,
+        // New structured metadata
+        product_type: offerMetadata.product_type,
+        max_amount: offerMetadata.max_amount,
+        intro_rate: offerMetadata.intro_rate,
+        apr: offerMetadata.apr,
+        fees: offerMetadata.fees,
+        url: offerMetadata.url,
+        qr_codes: offerMetadata.qr_codes,
       });
 
       if (insertError) console.error('Failed to save offer:', insertError);
