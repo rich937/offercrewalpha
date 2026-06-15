@@ -216,14 +216,15 @@ export default function Dashboard() {
         if (!error) filePaths.push(fileName);
       }
 
-      // === SAVE TO OFFERS TABLE ===
+        // === SAVE TO OFFERS TABLE ===
       const { error: insertError } = await supabase.from('offers').insert({
         user_id: user.id,
         lender: detectedLender,
         file_count: files.length,
         file_paths: filePaths,
         sequence_number: Date.now(),
-        raw_grok_response: result.crewResponse,
+        raw_grok_response: result.crewResponse,        // full raw response
+        crew_conversation: cleanedMessages,            // ← NEW: clean conversation JSON
       });
 
       if (insertError) console.error('Failed to save offer:', insertError);
