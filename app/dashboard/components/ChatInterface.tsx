@@ -99,34 +99,37 @@ export default function ChatInterface({
             <img src="/logo.png" alt="OfferCrew" className="h-9" />
           </div>
 
-          {/* Chat Messages */}
-          <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'items-start gap-3'}`}>
-                {msg.type === 'user' ? (
-                  <div className="w-11 h-11 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-bold mt-1 flex-shrink-0">
-                    {getUserInitial()}
-                  </div>
-                ) : (
-                  <img
-                    src={getIconPath(msg.type)}
-                    alt={msg.type}
-                    className="w-11 h-11 rounded-2xl mt-1 flex-shrink-0"
-                  />
-                )}
-
-                <div className="max-w-[78%]">
-                  <div className={`text-sm font-semibold mb-1 px-1 ${msg.type === 'user' ? 'text-right text-cyan-600' : 'text-cyan-600'}`}>
-                    {msg.type === 'user' ? (msg.username || 'You') : msg.type.charAt(0).toUpperCase() + msg.type.slice(1)}
-                  </div>
-                  <div className={`p-4 rounded-3xl shadow-sm ${msg.type === 'user' ? 'bg-blue-100' : 'bg-white'}`}>
-                    {msg.text}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {isResponding && <div className="text-gray-400 italic">Crew is thinking...</div>}
+       {/* Chat Messages */}
+<div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
+  {chatMessages.map((msg, i) => {
+    const displayText = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text || msg);
+    return (
+      <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'items-start gap-3'}`}>
+        {msg.type === 'user' ? (
+          <div className="w-11 h-11 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-bold mt-1 flex-shrink-0">
+            {getUserInitial()}
           </div>
+        ) : (
+          <img
+            src={getIconPath(msg.type)}
+            alt={msg.type}
+            className="w-11 h-11 rounded-2xl mt-1 flex-shrink-0"
+          />
+        )}
+
+        <div className="max-w-[78%]">
+          <div className={`text-sm font-semibold mb-1 px-1 ${msg.type === 'user' ? 'text-right text-cyan-600' : 'text-cyan-600'}`}>
+            {msg.type === 'user' ? (msg.username || 'You') : msg.type.charAt(0).toUpperCase() + msg.type.slice(1)}
+          </div>
+          <div className={`p-4 rounded-3xl shadow-sm ${msg.type === 'user' ? 'bg-blue-100' : 'bg-white'}`}>
+            {displayText}
+          </div>
+        </div>
+      </div>
+    );
+  })}
+  {isResponding && <div className="text-gray-400 italic">Crew is thinking...</div>}
+</div>
 
           {/* Input Area */}
           <div className="border-t p-4 bg-white">

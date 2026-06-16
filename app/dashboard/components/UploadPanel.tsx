@@ -141,7 +141,7 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
       // Extra safety: force refresh again after DB write
       setTimeout(() => {
         onUploadComplete();
-      }, 800);
+      }, 1200);
 
     } catch (err) {
       console.error('[UPLOAD] Error:', err);
