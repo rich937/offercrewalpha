@@ -3,19 +3,11 @@
 
 interface PreviousOffersProps {
   history: any[];
+  onGeneratePodcast: (offer: any) => void;
+  onWatchPodcast: (offer: any) => void;
 }
 
-export default function PreviousOffers({ history }: PreviousOffersProps) {
-  const reAnalyzeOffer = (offer: any) => {
-    console.log("Re-analyzing offer:", offer);
-    // This will be wired up to the parent later if needed
-    alert(`Re-analyzing ${offer.lender}... (connect to analyzeWithCrew in parent)`);
-  };
-
-  const generatePodcast = (offer: any) => {
-    alert(`Generating podcast for ${offer.lender}... (will connect to /api/podcast)`);
-  };
-
+export default function PreviousOffers({ history, onGeneratePodcast, onWatchPodcast }: PreviousOffersProps) {
   return (
     <div className="w-80 flex-shrink-0">
       <h2 className="text-xl font-semibold mb-6">Previous Offers</h2>
@@ -29,7 +21,6 @@ export default function PreviousOffers({ history }: PreviousOffersProps) {
         {history.map((offer, i) => (
           <div 
             key={i} 
-            onClick={() => reAnalyzeOffer(offer)}
             className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all"
           >
             <p className="font-semibold text-lg">{offer.lender}</p>
@@ -42,24 +33,18 @@ export default function PreviousOffers({ history }: PreviousOffersProps) {
 
             <div className="mt-4 flex gap-3">
               <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  generatePodcast(offer); 
-                }}
+                onClick={() => onGeneratePodcast(offer)}
                 className="flex-1 py-2.5 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:brightness-110"
               >
-                🎙️ Podcast
+                🎙️ Generate Podcast
               </button>
+              
               {offer.podcast_video_url && (
                 <button 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    // openVideoViewer will be handled in parent
-                    alert("Opening video player...");
-                  }} 
+                  onClick={() => onWatchPodcast(offer)}
                   className="flex-1 py-2.5 text-sm bg-black text-white rounded-xl hover:bg-gray-800"
                 >
-                  ▶ Watch
+                  ▶ Watch Podcast
                 </button>
               )}
             </div>
