@@ -1,44 +1,29 @@
+// app/api/analyze/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import REFERENCE_GUIDE from '../../lib/reference-guide';
+
+let supabaseClient: any = null;
+const getSupabase = () => {
+  if (!supabaseClient) {
+    const { createClient } = require('@supabase/supabase-js');
+    supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return supabaseClient;
+};
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
-         const systemPrompt = `You are the OfferCrew — four lively, entertaining robots (Ledger, Shade, Spark, Clara) reacting to financial junk mail.
+    if (files.length === 0) {
+      return NextResponse.json({ success: false, error: "No files uploaded" });
+    }
 
-${REFERENCE_GUIDE}
-
-MANDATORY RESPONSE FORMAT:
-Respond **ONLY** with this exact JSON:
-
-{
-  "lender": "Exact Lender Name",
-  "product_type": "Personal Loan | Credit Card | HELOC | etc.",
-  "max_amount": number or null,
-  "intro_rate": string or null,
-  "apr": string or null,
-  "fees": string or null,
-  "url": string or null,
-  "qr_codes": ["any QR code text or URL"],
-  "messages": [
-    {"speaker": "Ledger", "text": "..."},
-    {"speaker": "Clara", "text": "..."},
-    ...
-  ]
-}
-
-BANTER RULES — MAKE IT MUCH MORE LIVELY:
-- Aim for **10–16 total messages** (much longer group chat).
-- Lots of natural back-and-forth: characters reacting to each other, interrupting, agreeing, roasting.
-- Spark: chaotic, wild jokes, high energy.
-- Shade: sarcastic, calls out tricks and fine print.
-- Clara: warm explanations, multiple turns, patient teacher.
-- Ledger: starts with lender identification, ends with structured summary + Offer Score.
-- Keep the energy high and entertaining.`;
-
-
+    const systemPrompt = `You are the OfferCrew... ${REFERENCE_GUIDE} ...`; // keep your full prompt
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
 
@@ -67,15 +52,60 @@ BANTER RULES — MAKE IT MUCH MORE LIVELY:
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || '{"lender":"Unknown Lender","messages":[]}';
+    let crewResponse = data.choices?.[0]?.message?.content || '{"lender":"Unknown Lender","messages":[]}';
 
-    return NextResponse.json({ success: true, crewResponse });
+    // Parse lender
+    let lender = "Unknown Lender";
+    try {
+      const jsonMatch = crewResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        lender = parsed.lender || lender;
+      }
+    } catch (e) {}
+
+    const supabase = getSupabase();
+
+    // Save files to Supabase Storage
+    const filePaths: string[] = [];
+    const offerFolder = `${lender.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${offerFolder}/page-${i}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from('mail-pieces')
+        .upload(fileName, file, { upsert: true });
+
+      if (!error) filePaths.push(fileName);
+    }
+
+    // Save to offers table
+    const { error: insertError } = await supabase.from('offers').insert({
+      user_id: (await supabase.auth.getUser()).data.user?.id,
+      lender: lender,
+      file_count: files.length,
+      file_paths: filePaths,
+      sequence_number: Date.now(),
+      raw_grok_response: crewResponse,
+      crew_conversation: crewResponse, // will be parsed later if needed
+    });
+
+    if (insertError) console.error('Insert error:', insertError);
+
+    return NextResponse.json({ 
+      success: true, 
+      crewResponse,
+      lender 
+    });
 
   } catch (error: any) {
     console.error('[ANALYZE] Error:', error);
     return NextResponse.json({ 
       success: false, 
-      crewResponse: '{"lender":"Unknown Lender","messages":[{"speaker":"Spark","text":"Sorry, I had trouble analyzing that piece."}]}' 
+      crewResponse: '{"lender":"Unknown Lender","messages":[{"speaker":"Ledger","text":"Sorry, I had trouble analyzing that piece."}]}' 
     });
   }
 }
