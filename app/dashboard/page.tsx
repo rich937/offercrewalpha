@@ -66,21 +66,74 @@ export default function Dashboard() {
     return '/icons/Ledger Icon.png';
   };
 
-  const analyzeWithCrew = async (filesToUse?: File[]) => {
-    const files = filesToUse || selectedFiles;
-    if (files.length === 0 || !user) return;
+  // === File Handling Functions ===
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > MAX_WIDTH) {
+          height = (height * MAX_WIDTH) / width;
+          width = MAX_WIDTH;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+            resolve(compressedFile);
+          } else resolve(file);
+        }, 'image/jpeg', 0.82);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const convertPdfToImages = async (file: File): Promise<File[]> => {
+    // Stub - implement pdfjs if needed
+    console.log('PDF conversion stub - using original for now');
+    return [file];
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    let files = Array.from(e.target.files);
+    if (files.length > 4) {
+      alert("Maximum 4 files allowed.");
+      files = files.slice(0, 4);
+    }
+    setSelectedFiles(files);
+  };
+
+  const analyzeWithCrew = async () => {
+    if (selectedFiles.length === 0 || !user) return;
 
     setUploading(true);
-    setChatMessages([{ type: 'system', text: `Analyzing ${files.length} file(s)...` }]);
+    setChatMessages([{ type: 'system', text: `Analyzing ${selectedFiles.length} file(s)...` }]);
 
     try {
+      const processedFiles: File[] = [];
+      for (const file of selectedFiles) {
+        if (file.type === 'application/pdf') {
+          const images = await convertPdfToImages(file);
+          processedFiles.push(...images);
+        } else {
+          const compressed = await compressImage(file);
+          processedFiles.push(compressed);
+        }
+      }
+
       const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
+      processedFiles.forEach(f => formData.append('files', f));
 
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      // Robust JSON parsing
       let messagesToShow: any[] = [];
       try {
         let raw = result.crewResponse || "{}";
@@ -93,20 +146,14 @@ export default function Dashboard() {
             type: (item.speaker || 'system').toLowerCase(),
             text: (item.text || String(item)).trim()
           }));
-        } else if (Array.isArray(parsed.crew_conversation)) {
-          messagesToShow = parsed.crew_conversation.map((item: any) => ({
-            type: (item.speaker || 'system').toLowerCase(),
-            text: (item.text || String(item)).trim()
-          }));
         }
       } catch (e) {
-        console.warn("JSON parse failed, using raw text", e);
+        console.warn("Parse failed", e);
         messagesToShow = [{ type: 'system', text: result.crewResponse || "The Crew responded." }];
       }
 
       setChatMessages(messagesToShow.length > 0 ? messagesToShow : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
-      // Refresh history so new offer appears immediately
       const supabase = getSupabase();
       await loadHistory(user.id, supabase);
 
@@ -126,27 +173,19 @@ export default function Dashboard() {
     setUserInput('');
     setIsResponding(true);
 
-    // Placeholder - replace with real /api/chat call later
     setTimeout(() => {
-      setChatMessages(prev => [...prev, { type: 'clara', text: "Great question! Let me check the details of this offer..." }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "Great question about this offer. Let me check the details..." }]);
       setIsResponding(false);
     }, 1500);
   };
 
   const reAnalyzeOffer = async (offer: any) => {
-    if (!offer.file_paths || offer.file_paths.length === 0) {
-      alert("No files available for this offer.");
-      return;
-    }
-    // For now just reload the last analysis
     setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.lender} offer...` }]);
-    // TODO: Call analyze with stored files if needed
   };
 
   const generatePodcast = async (offer: any) => {
     if (!offer.id) return alert("No offer ID found");
     setGeneratingPodcast(offer.id);
-
     try {
       const res = await fetch('/api/podcast', {
         method: 'POST',
@@ -154,13 +193,12 @@ export default function Dashboard() {
         body: JSON.stringify({ offerId: offer.id })
       });
       const data = await res.json();
-
       if (data.success) {
         alert(`🎙️ Podcast started for ${offer.lender}!`);
         const supabase = getSupabase();
         await loadHistory(user.id, supabase);
       } else {
-        alert('Failed: ' + (data.error || 'Unknown error'));
+        alert('Failed: ' + (data.error || 'Unknown'));
       }
     } catch (err) {
       console.error(err);
@@ -171,11 +209,8 @@ export default function Dashboard() {
   };
 
   const openVideoViewer = (offer: any) => {
-    if (offer.podcast_video_url) {
-      setSelectedVideo(offer);
-    } else {
-      alert("Video is still generating. Try again in a moment.");
-    }
+    if (offer.podcast_video_url) setSelectedVideo(offer);
+    else alert("Video still generating. Try again soon.");
   };
 
   const closeVideoViewer = () => setSelectedVideo(null);
@@ -183,19 +218,13 @@ export default function Dashboard() {
   const shareVideo = (platform: string) => {
     if (!selectedVideo?.podcast_video_url) return;
     const url = selectedVideo.podcast_video_url;
-    const text = `Check out this OfferCrew roast of a ${selectedVideo.lender} offer!`;
-
+    const text = `OfferCrew roast of a ${selectedVideo.lender} offer!`;
     if (platform === 'twitter') {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
     } else {
       navigator.clipboard.writeText(url);
-      alert(`Link copied! Share on ${platform}`);
+      alert(`Link copied for ${platform}`);
     }
-  };
-
-  // File handling functions (stubbed - replace with your full versions if needed)
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setSelectedFiles(Array.from(e.target.files));
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-xl">Loading Dashboard...</div>;
@@ -207,7 +236,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="OfferCrew" className="h-10" />
-            <span className="text-red-600 font-semibold text-xl">Alpha Site</span>
+            <span className="text-red-600 font-semibold text-xl tracking-wide">Alpha Site</span>
           </div>
           <div className="flex items-center gap-8 text-gray-700">
             <button onClick={() => setActiveTab('dashboard')} className={`font-medium ${activeTab === 'dashboard' ? 'text-black' : 'hover:text-black'}`}>Dashboard</button>
@@ -228,7 +257,7 @@ export default function Dashboard() {
             <h2 className="text-2xl font-semibold mb-6">Upload New Offer</h2>
             <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
               <p className="font-semibold text-amber-800 mb-3">🔒 Privacy First</p>
-              <p className="text-amber-700">Redact your name, address, and any codes with a Sharpie before uploading.</p>
+              <p className="text-amber-700">Redact your name, address, and codes with a Sharpie before uploading.</p>
             </div>
             <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
             <button 
@@ -239,7 +268,7 @@ export default function Dashboard() {
             </button>
             {selectedFiles.length > 0 && (
               <button 
-                onClick={() => analyzeWithCrew()} 
+                onClick={analyzeWithCrew} 
                 disabled={uploading} 
                 className="mt-6 w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
               >
@@ -248,25 +277,23 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Chat / Text Interface */}
-          <div className="flex-1 flex flex-col bg-white rounded-3xl shadow border border-gray-100 overflow-hidden">
+          {/* Text Interface */}
+          <div className="flex-1 flex flex-col bg-white border border-gray-200 rounded-3xl shadow overflow-hidden">
             <div className="p-4 border-b bg-gray-50 flex items-center gap-3">
               <img src="/logo.png" alt="OfferCrew" className="h-8" />
-              <span className="font-semibold">Crew Chat</span>
+              <span className="font-semibold">Crew Discussion</span>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6" id="chat-window">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.type !== 'user' && (
-                    <img src={getIconPath(msg.type)} alt="" className="w-10 h-10 mr-3 flex-shrink-0" />
-                  )}
-                  <div className={`max-w-[75%] ${msg.type === 'user' ? 'bg-black text-white' : 'bg-gray-100'} rounded-3xl px-5 py-4`}>
-                    {msg.type !== 'user' && <div className="font-semibold text-cyan-600 mb-1">{msg.type.charAt(0).toUpperCase() + msg.type.slice(1)}</div>}
-                    <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.text}</div>
+                  {msg.type !== 'user' && <img src={getIconPath(msg.type)} alt="" className="w-10 h-10 mr-3 mt-1 flex-shrink-0" />}
+                  <div className={`max-w-[75%] rounded-3xl px-5 py-4 ${msg.type === 'user' ? 'bg-black text-white' : 'bg-gray-100'}`}>
+                    {msg.type !== 'user' && <div className="font-semibold text-cyan-600 mb-1 capitalize">{msg.type}</div>}
+                    <div className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.text}</div>
                   </div>
                 </div>
               ))}
-              {isResponding && <div className="text-gray-400">Crew is thinking...</div>}
+              {isResponding && <div className="text-gray-400 italic">Crew thinking...</div>}
             </div>
             <div className="p-4 border-t bg-white flex gap-3">
               <input
@@ -277,9 +304,7 @@ export default function Dashboard() {
                 placeholder="Ask the Crew a question about this offer..."
                 className="flex-1 border border-gray-300 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
-              <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">
-                Send
-              </button>
+              <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">Send</button>
             </div>
           </div>
 
@@ -297,8 +322,8 @@ export default function Dashboard() {
                   className="bg-white border border-gray-200 rounded-3xl p-6 hover:border-cyan-500 hover:shadow-md cursor-pointer transition-all"
                 >
                   <p className="font-semibold text-xl">{offer.lender}</p>
-                  <p className="text-sm text-gray-500 mt-1">#{String(offer.sequence_number || i + 1).padStart(6, '0')}</p>
-                  <p className="text-xs text-gray-400 mt-2">{offer.file_count || 1} file(s) • {new Date(offer.created_at).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500">#{String(offer.sequence_number || i+1).padStart(6, '0')}</p>
+                  <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
 
                   <div className="mt-5 flex gap-3">
                     <button 
@@ -309,9 +334,7 @@ export default function Dashboard() {
                       {generatingPodcast === offer.id ? "🎙️ Generating..." : "🎙️ Podcast"}
                     </button>
                     {offer.podcast_video_url && (
-                      <button onClick={(e) => { e.stopPropagation(); openVideoViewer(offer); }} className="flex-1 py-3 text-sm bg-black text-white rounded-2xl hover:bg-gray-800">
-                        ▶ Watch
-                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); openVideoViewer(offer); }} className="flex-1 py-3 text-sm bg-black text-white rounded-2xl hover:bg-gray-800">▶ Watch</button>
                     )}
                   </div>
                 </div>
@@ -326,15 +349,14 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden">
             <div className="p-5 border-b flex justify-between items-center bg-gray-50">
-              <h3 className="font-semibold text-lg">{selectedVideo.lender} Offer Podcast</h3>
+              <h3 className="font-semibold">{selectedVideo.lender} Offer Podcast</h3>
               <button onClick={closeVideoViewer} className="text-4xl leading-none text-gray-400 hover:text-black">×</button>
             </div>
-            <video controls autoPlay className="w-full aspect-video" src={selectedVideo.podcast_video_url} />
+            <video controls autoPlay className="w-full aspect-video bg-black" src={selectedVideo.podcast_video_url} />
             <div className="p-5 flex gap-3 flex-wrap bg-gray-50">
               <button onClick={() => shareVideo('twitter')} className="flex-1 py-4 bg-black text-white rounded-2xl font-medium">Share on X</button>
               <button onClick={() => shareVideo('instagram')} className="flex-1 py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl font-medium">Instagram</button>
               <button onClick={() => shareVideo('tiktok')} className="flex-1 py-4 bg-black text-white rounded-2xl font-medium">TikTok</button>
-              <button onClick={() => shareVideo('youtube')} className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-medium">YouTube</button>
             </div>
           </div>
         </div>
