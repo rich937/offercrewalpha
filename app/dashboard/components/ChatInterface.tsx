@@ -51,9 +51,9 @@ export default function ChatInterface({
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: question,
-          recentOfferContext: "Current offer context" 
+          recentOfferContext: "Current offer context"
         })
       });
 

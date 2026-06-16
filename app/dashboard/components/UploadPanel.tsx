@@ -5,9 +5,10 @@ import { useState } from 'react';
 
 interface UploadPanelProps {
   onUploadComplete: () => void;
+  onAnalysisComplete?: (messages: any[]) => void;   // ← NEW
 }
 
-export default function UploadPanel({ onUploadComplete }: UploadPanelProps) {
+export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: UploadPanelProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -108,16 +109,37 @@ export default function UploadPanel({ onUploadComplete }: UploadPanelProps) {
       const result = await res.json();
       console.log('[UPLOAD] /api/analyze response:', result);
 
-      if (result.success === false) {
-        throw new Error(result.error || "Analysis failed");
+      let messagesToShow: any[] = [];
+      try {
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) raw = jsonMatch[0];
+
+        const parsed = JSON.parse(raw);
+
+        if (parsed.messages && Array.isArray(parsed.messages)) {
+          messagesToShow = parsed.messages.map((item: any) => ({
+            type: (item.speaker || 'system').toLowerCase(),
+            text: (item.text || String(item)).trim()
+          }));
+        }
+      } catch (e) {
+        console.warn("[UPLOAD] JSON parse failed:", e);
+        messagesToShow = [{ type: 'system', text: result.crewResponse?.substring(0, 500) || "The Crew responded." }];
       }
 
-      // Trigger refresh in parent
-      onUploadComplete();
+      console.log('[UPLOAD] Parsed messages:', messagesToShow);
+
+      // Pass messages up to main page → ChatInterface
+      if (onAnalysisComplete) {
+        onAnalysisComplete(messagesToShow);
+      }
+
+      onUploadComplete(); // Refresh Previous Offers
 
     } catch (err) {
       console.error('[UPLOAD] Error:', err);
-      alert("Sorry, I had trouble analyzing that offer. Check console (F12) for details.");
+      alert("Sorry, I had trouble analyzing that offer.");
     }
 
     setSelectedFiles([]);
