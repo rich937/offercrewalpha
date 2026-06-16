@@ -91,12 +91,13 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
     }
   };
 
+ // app/dashboard/components/UploadPanel.tsx
+// ... (keep the top part and file handling functions the same)
+
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
-    console.log('[UPLOAD] Starting analysis with', selectedFiles.length, 'files');
-
     try {
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
@@ -105,46 +106,18 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
         method: 'POST', 
         body: formData 
       });
-
+      
       const result = await res.json();
-      console.log('[UPLOAD] /api/analyze response:', result);
 
-      let messagesToShow: any[] = [];
-      try {
-        let raw = result.crewResponse || "{}";
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
-        if (jsonMatch) raw = jsonMatch[0];
-
-        const parsed = JSON.parse(raw);
-
-        if (parsed.messages && Array.isArray(parsed.messages)) {
-          messagesToShow = parsed.messages.map((item: any) => ({
-            type: (item.speaker || 'system').toLowerCase(),
-            text: (item.text || String(item)).trim()
-          }));
-        }
-      } catch (e) {
-        console.warn("[UPLOAD] JSON parse failed:", e);
-        messagesToShow = [{ type: 'Ledger', text: result.crewResponse?.substring(0, 500) || "The Crew responded." }];
-      }
-
-      console.log('[UPLOAD] Parsed messages:', messagesToShow);
-
-      // Pass messages up to main page → ChatInterface
-      if (onAnalysisComplete) {
-        onAnalysisComplete(messagesToShow);
-      }
-
-           // After successful parse and onUploadComplete()
-      onUploadComplete(); 
-
-      // Extra safety: force refresh again after DB write
-      setTimeout(() => {
+      if (result.success) {
+        // Notify parent (main page) to refresh history
         onUploadComplete();
-      }, 1200);
+      } else {
+        alert("Analysis completed but had issues saving.");
+      }
 
     } catch (err) {
-      console.error('[UPLOAD] Error:', err);
+      console.error(err);
       alert("Sorry, I had trouble analyzing that offer.");
     }
 

@@ -59,12 +59,11 @@ export default function Dashboard() {
     else setHistory(data || []);
   };
 
-    const handleNewOffer = async () => {
-    if (user) {
-      const supabase = getSupabase();
-      await loadHistory(user.id, supabase);
-    }
-  };
+   const handleNewOffer = () => {
+  if (user) {
+    loadHistory(user.id, getSupabase());
+  }
+};
 
   const generatePodcast = async (offer: any) => {
     if (!offer.id) return alert("No offer ID found");
@@ -151,10 +150,7 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-        <UploadPanel 
-  onUploadComplete={handleNewOffer}
-  onAnalysisComplete={setChatMessages} 
-/>
+       <UploadPanel onUploadComplete={handleNewOffer} />
           
           <ChatInterface 
             chatMessages={chatMessages} 
