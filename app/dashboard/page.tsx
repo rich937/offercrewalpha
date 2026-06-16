@@ -51,7 +51,7 @@ export default function Dashboard() {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    if (error) console.error('Error loading history:', error);
+    if (error) console.error(error);
     else setHistory(data || []);
   };
 
@@ -63,7 +63,7 @@ export default function Dashboard() {
     setIsResponding(true);
 
     setTimeout(() => {
-      setChatMessages(prev => [...prev, { type: 'clara', text: "That's a great question about this offer. Let me check the details..." }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "That's a great question about this offer..." }]);
       setIsResponding(false);
     }, 1200);
   };
@@ -170,7 +170,33 @@ export default function Dashboard() {
       const res = await fetch('/api/analyze', { method: 'POST', body: formData });
       const result = await res.json();
 
-      setChatMessages([{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
+      let messagesToShow: any[] = [];
+
+      try {
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) raw = jsonMatch[0];
+
+        const parsed = JSON.parse(raw);
+
+        if (Array.isArray(parsed.messages)) {
+          messagesToShow = parsed.messages.map((item: any) => ({
+            type: (item.speaker || 'system').toLowerCase(),
+            text: (item.text || String(item)).trim()
+          }));
+        } else if (Array.isArray(parsed.crew_conversation)) {
+          messagesToShow = parsed.crew_conversation.map((item: any) => ({
+            type: (item.speaker || 'system').toLowerCase(),
+            text: (item.text || String(item)).trim()
+          }));
+        }
+      } catch (e) {
+        console.warn("JSON parse failed", e);
+      }
+
+      const cleanedMessages = messagesToShow.filter(msg => msg.text && msg.text.length > 3);
+
+      setChatMessages(cleanedMessages.length > 0 ? cleanedMessages : [{ type: 'system', text: result.crewResponse || "The Crew responded." }]);
 
       const supabase = getSupabase();
       await loadHistory(user.id, supabase);
@@ -184,7 +210,7 @@ export default function Dashboard() {
     setUploading(false);
   };
 
- const reAnalyzeOffer = async (offer: any) => {
+  const reAnalyzeOffer = async (offer: any) => {
     if (!offer.file_paths || offer.file_paths.length === 0) {
       setChatMessages([{ type: 'system', text: "No images found for this offer." }]);
       return;
