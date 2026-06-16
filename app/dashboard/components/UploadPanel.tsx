@@ -72,40 +72,52 @@ export default function UploadPanel({ onUploadComplete }: UploadPanelProps) {
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    let files = Array.from(e.target.files).slice(0, 4);
-    const processed: File[] = [];
-    for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        const compressed = await compressImage(file);
-        processed.push(compressed);
-      } else if (file.type === 'application/pdf') {
-        const pdfImages = await convertPdfToImages(file);
-        processed.push(...pdfImages);
-      } else {
-        processed.push(file);
+    if (e.target.files) {
+      let files = Array.from(e.target.files).slice(0, 4);
+      const processed: File[] = [];
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          const compressed = await compressImage(file);
+          processed.push(compressed);
+        } else if (file.type === 'application/pdf') {
+          const pdfImages = await convertPdfToImages(file);
+          processed.push(...pdfImages);
+        } else {
+          processed.push(file);
+        }
       }
+      setSelectedFiles(processed.slice(0, 8));
     }
-    setSelectedFiles(processed.slice(0, 8));
   };
 
   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
+    console.log('[UPLOAD] Starting analysis with', selectedFiles.length, 'files');
+
     try {
       const formData = new FormData();
       selectedFiles.forEach(f => formData.append('files', f));
 
-      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
-      const result = await res.json();
+      const res = await fetch('/api/analyze', { 
+        method: 'POST', 
+        body: formData 
+      });
 
-      // Refresh parent history
+      const result = await res.json();
+      console.log('[UPLOAD] /api/analyze response:', result);
+
+      if (result.success === false) {
+        throw new Error(result.error || "Analysis failed");
+      }
+
+      // Trigger refresh in parent
       onUploadComplete();
 
     } catch (err) {
-      console.error(err);
-      alert("Sorry, I had trouble analyzing that offer.");
+      console.error('[UPLOAD] Error:', err);
+      alert("Sorry, I had trouble analyzing that offer. Check console (F12) for details.");
     }
 
     setSelectedFiles([]);
