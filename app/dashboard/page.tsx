@@ -59,8 +59,11 @@ export default function Dashboard() {
     else setHistory(data || []);
   };
 
-  const handleNewOffer = () => {
-    if (user) loadHistory(user.id, getSupabase());
+    const handleNewOffer = async () => {
+    if (user) {
+      const supabase = getSupabase();
+      await loadHistory(user.id, supabase);
+    }
   };
 
   const generatePodcast = async (offer: any) => {
@@ -148,9 +151,9 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-         <UploadPanel 
+        <UploadPanel 
   onUploadComplete={handleNewOffer}
-  onAnalysisComplete={setChatMessages}   // ← This line is key
+  onAnalysisComplete={setChatMessages} 
 />
           
           <ChatInterface 

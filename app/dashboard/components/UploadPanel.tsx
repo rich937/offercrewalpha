@@ -125,7 +125,7 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
         }
       } catch (e) {
         console.warn("[UPLOAD] JSON parse failed:", e);
-        messagesToShow = [{ type: 'system', text: result.crewResponse?.substring(0, 500) || "The Crew responded." }];
+        messagesToShow = [{ type: 'Ledger', text: result.crewResponse?.substring(0, 500) || "The Crew responded." }];
       }
 
       console.log('[UPLOAD] Parsed messages:', messagesToShow);
@@ -135,7 +135,13 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
         onAnalysisComplete(messagesToShow);
       }
 
-      onUploadComplete(); // Refresh Previous Offers
+           // After successful parse and onUploadComplete()
+      onUploadComplete(); 
+
+      // Extra safety: force refresh again after DB write
+      setTimeout(() => {
+        onUploadComplete();
+      }, 800);
 
     } catch (err) {
       console.error('[UPLOAD] Error:', err);
