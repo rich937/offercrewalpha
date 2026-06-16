@@ -36,9 +36,7 @@ export default function Dashboard() {
         const supabase = getSupabase();
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         setUser(currentUser);
-        if (currentUser) {
-          await loadHistory(currentUser.id, supabase);
-        }
+        if (currentUser) await loadHistory(currentUser.id, supabase);
       } catch (e) {
         console.error(e);
       }
@@ -65,10 +63,7 @@ export default function Dashboard() {
     setIsResponding(true);
 
     setTimeout(() => {
-      setChatMessages(prev => [...prev, { 
-        type: 'clara', 
-        text: "That's a great question! Let me think about that in the context of this offer..." 
-      }]);
+      setChatMessages(prev => [...prev, { type: 'clara', text: "That's a great question about this offer. Let me check the details..." }]);
       setIsResponding(false);
     }, 1200);
   };
@@ -189,10 +184,50 @@ export default function Dashboard() {
     setUploading(false);
   };
 
-  const reAnalyzeOffer = async (offer: any) => {
-    console.log("Re-analyzing offer:", offer);
-    // Add your full re-analyze logic here if needed
+ const reAnalyzeOffer = async (offer: any) => {
+    if (!offer.file_paths || offer.file_paths.length === 0) {
+      setChatMessages([{ type: 'system', text: "No images found for this offer." }]);
+      return;
+    }
+
+    setUploading(true);
+    setChatMessages([{ type: 'system', text: `Re-analyzing ${offer.lender} offer...` }]);
+
+    try {
+      const supabase = getSupabase();
+      const processedFiles: File[] = [];
+
+      for (const path of offer.file_paths) {
+        const { data, error } = await supabase.storage
+          .from('mail-pieces')
+          .download(path);
+
+        if (error) {
+          console.error('Download error:', error);
+          continue;
+        }
+
+        const file = new File([data], path.split('/').pop() || 'image.jpg', { 
+          type: 'image/jpeg' 
+        });
+        processedFiles.push(file);
+      }
+
+      if (processedFiles.length === 0) {
+        setChatMessages([{ type: 'system', text: "Could not load images for this offer." }]);
+        return;
+      }
+
+      await analyzeWithCrew(processedFiles);
+
+    } catch (err) {
+      console.error(err);
+      setChatMessages([{ type: 'system', text: "Sorry, could not re-analyze this offer." }]);
+    } finally {
+      setUploading(false);
+    }
   };
+
 
   const generatePodcast = async (offer: any) => {
     if (!offer.id) return alert("No offer ID found");
@@ -208,7 +243,7 @@ export default function Dashboard() {
       const data = await res.json();
 
       if (data.success) {
-        alert(`🎙️ Podcast generation started for ${offer.lender}!\nVideo ID: ${data.video_id}`);
+        alert(`🎙️ Podcast generation started for ${offer.lender}!`);
         const supabase = getSupabase();
         await loadHistory(user.id, supabase);
       } else {
@@ -272,7 +307,7 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-          {/* Upload Section */}
+          {/* Upload Column */}
           <div className="w-80 flex-shrink-0">
             <h2 className="text-xl font-semibold mb-6">Upload New Offer</h2>
             <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm">
@@ -280,24 +315,17 @@ export default function Dashboard() {
               <p className="text-amber-700">Redact name, address, and codes with a Sharpie before uploading.</p>
             </div>
             <input id="fileInput" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
-            <button
-              onClick={() => document.getElementById('fileInput')?.click()}
-              className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800"
-            >
+            <button onClick={() => document.getElementById('fileInput')?.click()} className="w-full py-4 bg-black text-white rounded-2xl font-semibold hover:bg-gray-800">
               📤 Select Photos or PDF (max 4)
             </button>
             {selectedFiles.length > 0 && (
-              <button
-                onClick={() => analyzeWithCrew()}
-                disabled={uploading}
-                className="mt-6 w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50"
-              >
+              <button onClick={() => analyzeWithCrew()} disabled={uploading} className="mt-6 w-full py-4 bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-2xl font-semibold hover:brightness-110 disabled:opacity-50">
                 {uploading ? 'Analyzing...' : 'Send to the Crew →'}
               </button>
             )}
           </div>
 
-          {/* Chat Section */}
+          {/* Chat Column */}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="bg-black rounded-[3rem] p-3 shadow-2xl flex-1 flex flex-col" style={{ maxWidth: '520px', margin: '0 auto' }}>
               <div className="bg-white rounded-[2.5rem] flex-1 flex flex-col overflow-hidden">
@@ -335,11 +363,7 @@ export default function Dashboard() {
                       placeholder="Ask the Crew a question..."
                       className="flex-1 px-5 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
-                    <button
-                      onClick={sendUserMessage}
-                      disabled={isResponding}
-                      className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
-                    >
+                    <button onClick={sendUserMessage} disabled={isResponding} className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50">
                       Send
                     </button>
                   </div>
@@ -356,28 +380,17 @@ export default function Dashboard() {
                 <p className="text-gray-400 text-center py-12">No offers yet.<br />Upload your first one!</p>
               )}
               {history.map((offer, i) => (
-                <div 
-                  key={i} 
-                  onClick={() => reAnalyzeOffer(offer)}
-                  className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-500 hover:shadow-md cursor-pointer transition-all"
-                >
+                <div key={i} onClick={() => reAnalyzeOffer(offer)} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-500 hover:shadow-md cursor-pointer transition-all">
                   <p className="font-semibold text-lg">{offer.lender}</p>
                   <p className="text-sm text-gray-500">#{String(offer.sequence_number || i+1).padStart(6, '0')}</p>
                   <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
                   
-                  <button
-                    onClick={(e) => { e.stopPropagation(); generatePodcast(offer); }}
-                    disabled={generatingPodcast === offer.id}
-                    className="mt-3 w-full py-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:brightness-110 disabled:opacity-50"
-                  >
+                  <button onClick={(e) => { e.stopPropagation(); generatePodcast(offer); }} disabled={generatingPodcast === offer.id} className="mt-3 w-full py-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:brightness-110 disabled:opacity-50">
                     {generatingPodcast === offer.id ? "🎙️ Generating..." : "🎙️ Generate Podcast"}
                   </button>
 
                   {offer.podcast_video_url && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openVideoViewer(offer); }}
-                      className="mt-2 w-full py-2 text-sm bg-black text-white rounded-xl hover:bg-gray-800"
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); openVideoViewer(offer); }} className="mt-2 w-full py-2 text-sm bg-black text-white rounded-xl hover:bg-gray-800">
                       ▶ Watch Podcast
                     </button>
                   )}
