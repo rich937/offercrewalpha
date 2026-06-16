@@ -19,11 +19,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
 
-    if (files.length === 0) {
-      return NextResponse.json({ success: false, error: "No files uploaded" });
-    }
-
-    const systemPrompt = `You are the OfferCrew... ${REFERENCE_GUIDE} ...`; // keep your full prompt
+    const systemPrompt = `You are the OfferCrew... ${REFERENCE_GUIDE} ...`; // your full prompt here
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
 
@@ -31,10 +27,7 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
       const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
-      content.push({
-        type: "image_url",
-        image_url: { url: `data:${mimeType};base64,${base64}` }
-      });
+      content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } });
     }
 
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -52,60 +45,47 @@ export async function POST(request: NextRequest) {
     });
 
     const data = await grokRes.json();
-    let crewResponse = data.choices?.[0]?.message?.content || '{"lender":"Unknown Lender","messages":[]}';
-
-    // Parse lender
-    let lender = "Unknown Lender";
-    try {
-      const jsonMatch = crewResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        lender = parsed.lender || lender;
-      }
-    } catch (e) {}
+    const crewResponse = data.choices?.[0]?.message?.content || '{"lender":"Unknown","messages":[]}';
 
     const supabase = getSupabase();
 
-    // Save files to Supabase Storage
+    // Save files
     const filePaths: string[] = [];
+    let lender = "Unknown Lender";
+    try {
+      const match = crewResponse.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        lender = parsed.lender || lender;
+      }
+    } catch {}
+
     const offerFolder = `${lender.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${offerFolder}/page-${i}.${fileExt}`;
-
-      const { error } = await supabase.storage
-        .from('mail-pieces')
-        .upload(fileName, file, { upsert: true });
-
-      if (!error) filePaths.push(fileName);
+      const fileName = `${offerFolder}/page-${i}.${file.name.split('.').pop() || 'jpg'}`;
+      await supabase.storage.from('mail-pieces').upload(fileName, file, { upsert: true });
+      filePaths.push(fileName);
     }
 
-    // Save to offers table
-    const { error: insertError } = await supabase.from('offers').insert({
+    // Save offer record
+    const { error } = await supabase.from('offers').insert({
       user_id: (await supabase.auth.getUser()).data.user?.id,
-      lender: lender,
+      lender,
       file_count: files.length,
       file_paths: filePaths,
       sequence_number: Date.now(),
       raw_grok_response: crewResponse,
-      crew_conversation: crewResponse, // will be parsed later if needed
+      crew_conversation: crewResponse,
     });
 
-    if (insertError) console.error('Insert error:', insertError);
+    if (error) console.error('Save error:', error);
 
-    return NextResponse.json({ 
-      success: true, 
-      crewResponse,
-      lender 
-    });
+    return NextResponse.json({ success: true, crewResponse });
 
-  } catch (error: any) {
-    console.error('[ANALYZE] Error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      crewResponse: '{"lender":"Unknown Lender","messages":[{"speaker":"Ledger","text":"Sorry, I had trouble analyzing that piece."}]}' 
-    });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ success: false, crewResponse: "Sorry, analysis failed." });
   }
 }
