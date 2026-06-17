@@ -18,20 +18,34 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
-    const userId = request.headers.get('x-user-id'); // We'll pass this from frontend
+    const userId = request.headers.get('x-user-id');
 
     if (!userId) {
-      return NextResponse.json({ success: false, error: "User not authenticated" });
+      return NextResponse.json({ success: false, error: "User not found" });
     }
 
-    const systemPrompt = `You are the OfferCrew... ${REFERENCE_GUIDE} MANDATORY RESPONSE FORMAT: Respond **ONLY** with valid JSON...`;
+    const systemPrompt = `You are the OfferCrew... ${REFERENCE_GUIDE}
+
+MANDATORY RESPONSE FORMAT - RESPOND WITH ONLY VALID JSON:
+{
+  "lender": "Exact Lender Name from the mail",
+  "messages": [
+    {"speaker": "Ledger", "text": "First message..."},
+    {"speaker": "Clara", "text": "..."},
+    {"speaker": "Spark", "text": "..."},
+    {"speaker": "Shade", "text": "..."}
+  ]
+}`;
 
     const content: any[] = [{ type: "text", text: systemPrompt }];
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString('base64');
       const mimeType = file.type.startsWith('image/') ? file.type : 'image/jpeg';
-      content.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } });
+      content.push({
+        type: "image_url",
+        image_url: { url: `data:${mimeType};base64,${base64}` }
+      });
     }
 
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -43,46 +57,41 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: "grok-3",
         messages: [{ role: "user", content }],
-        temperature: 0.85,
-        max_tokens: 1400,
+        temperature: 0.8,
+        max_tokens: 1600,
       }),
     });
 
     const data = await grokRes.json();
-    let crewResponse = data.choices?.[0]?.message?.content || '{"lender":"Unknown Lender","messages":[]}';
+    let crewResponse = data.choices?.[0]?.message?.content || '{}';
 
-    // Parse JSON safely
-    let parsed: any = {};
+    // Improved parsing
+    let parsed = { lender: "Unknown Lender", messages: [] as any[] };
     try {
       const jsonMatch = crewResponse.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : crewResponse);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
     } catch (e) {
-      parsed = { lender: "Unknown Lender", messages: [] };
+      console.warn("JSON parse failed, using fallback");
     }
 
     const lender = parsed.lender || "Unknown Lender";
-    const messages = parsed.messages || [];
+    const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
 
+    // Save to Supabase
     const supabase = getSupabase();
-
-    // Upload files to storage
     const filePaths: string[] = [];
     const offerFolder = `${lender.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${userId}/${offerFolder}/page-${i}.${fileExt}`;
-      
-      const { error } = await supabase.storage
-        .from('mail-pieces')
-        .upload(fileName, file, { upsert: true });
-
+      const fileName = `${userId}/${offerFolder}/page-${i}.jpg`;
+      const { error } = await supabase.storage.from('mail-pieces').upload(fileName, file, { upsert: true });
       if (!error) filePaths.push(fileName);
     }
 
-    // Save offer record
-    const { error: insertError } = await supabase.from('offers').insert({
+    await supabase.from('offers').insert({
       user_id: userId,
       lender: lender,
       file_count: files.length,
@@ -91,8 +100,6 @@ export async function POST(request: NextRequest) {
       raw_grok_response: crewResponse,
       crew_conversation: messages,
     });
-
-    if (insertError) console.error('Insert error:', insertError);
 
     return NextResponse.json({ 
       success: true, 
