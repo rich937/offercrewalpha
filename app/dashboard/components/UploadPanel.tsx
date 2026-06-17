@@ -91,39 +91,47 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
     }
   };
 
- // app/dashboard/components/UploadPanel.tsx
-// ... (keep the top part and file handling functions the same)
+ const analyzeWithCrew = async () => {
+  if (selectedFiles.length === 0) return;
 
-  const analyzeWithCrew = async () => {
-    if (selectedFiles.length === 0) return;
+  setUploading(true);
+  console.log('[UPLOAD] Starting analysis with', selectedFiles.length, 'files');
 
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      selectedFiles.forEach(f => formData.append('files', f));
+  try {
+    const formData = new FormData();
+    selectedFiles.forEach(f => formData.append('files', f));
 
-      const res = await fetch('/api/analyze', { 
-        method: 'POST', 
-        body: formData 
-      });
-      
-      const result = await res.json();
-
-      if (result.success) {
-        // Notify parent (main page) to refresh history
-        onUploadComplete();
-      } else {
-        alert("Analysis completed but had issues saving.");
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'x-user-id': user?.id || ''   // ← THIS IS THE IMPORTANT LINE
       }
+    });
 
-    } catch (err) {
-      console.error(err);
-      alert("Sorry, I had trouble analyzing that offer.");
+    const result = await res.json();
+    console.log('[UPLOAD] /api/analyze response:', result);
+
+    // ... rest of your parsing code stays the same ...
+
+    if (onAnalysisComplete) {
+      onAnalysisComplete(messagesToShow);
     }
 
-    setSelectedFiles([]);
-    setUploading(false);
-  };
+    onUploadComplete();
+
+    setTimeout(() => {
+      onUploadComplete();
+    }, 800);
+
+  } catch (err) {
+    console.error('[UPLOAD] Error:', err);
+    alert("Sorry, I had trouble analyzing that offer.");
+  }
+
+  setSelectedFiles([]);
+  setUploading(false);
+};
 
   return (
     <div className="w-80 flex-shrink-0">
