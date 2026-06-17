@@ -29,7 +29,6 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isResponding, setIsResponding] = useState(false);
-  const [generatingPodcast, setGeneratingPodcast] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
 
   useEffect(() => {
@@ -38,9 +37,7 @@ export default function Dashboard() {
         const supabase = getSupabase();
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         setUser(currentUser);
-        if (currentUser) {
-          await loadHistory(currentUser.id, supabase);
-        }
+        if (currentUser) await loadHistory(currentUser.id, supabase);
       } catch (e) {
         console.error(e);
       }
@@ -65,7 +62,6 @@ export default function Dashboard() {
 
   const generatePodcast = async (offer: any) => {
     if (!offer.id) return alert("No offer ID found");
-    setGeneratingPodcast(offer.id);
 
     try {
       const res = await fetch('/api/podcast', {
@@ -76,16 +72,14 @@ export default function Dashboard() {
       const data = await res.json();
 
       if (data.success) {
-        alert(`🎙️ Podcast started for ${offer.lender}!`);
-        handleNewOffer(); // refresh list
+        alert(`🎙️ Podcast generation started for ${offer.lender}!`);
+        handleNewOffer(); // Trigger refresh + polling
       } else {
         alert('Failed: ' + (data.error || 'Unknown error'));
       }
     } catch (err) {
       console.error(err);
       alert('Error generating podcast');
-    } finally {
-      setGeneratingPodcast(null);
     }
   };
 
@@ -124,37 +118,20 @@ export default function Dashboard() {
             <span className="text-red-600 font-semibold text-xl">Alpha Site</span>
           </div>
           <div className="flex items-center gap-10 text-lg">
-            <button 
-              onClick={() => setActiveTab('dashboard')} 
-              className={activeTab === 'dashboard' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}
-            >
-              Dashboard
-            </button>
-            <button 
-              onClick={() => setActiveTab('blog')} 
-              className={activeTab === 'blog' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}
-            >
-              Blog / Podcasts
-            </button>
-            <button 
-              onClick={() => setActiveTab('about')} 
-              className={activeTab === 'about' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}
-            >
-              About
-            </button>
+            <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Dashboard</button>
+            <button onClick={() => setActiveTab('blog')} className={activeTab === 'blog' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Blog / Podcasts</button>
+            <button onClick={() => setActiveTab('about')} className={activeTab === 'about' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>About</button>
           </div>
         </div>
       </nav>
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-         
-
           <UploadPanel 
-  onUploadComplete={handleNewOffer}
-  onAnalysisComplete={setChatMessages}   // ← This line is critical
-  user={user} 
-/>
+            onUploadComplete={handleNewOffer}
+            onAnalysisComplete={setChatMessages}
+            user={user} 
+          />
           
           <ChatInterface 
             chatMessages={chatMessages} 

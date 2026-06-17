@@ -18,23 +18,16 @@ export async function POST(request: NextRequest) {
     const { offerId } = await request.json();
 
     const supabase = getSupabase();
-    const { data: offer, error } = await supabase
+    const { data: offer } = await supabase
       .from('offers')
       .select('*')
       .eq('id', offerId)
       .single();
 
-    if (error || !offer) {
-      return NextResponse.json({ success: false, error: 'Offer not found' });
-    }
+    if (!offer) return NextResponse.json({ success: false, error: 'Offer not found' });
 
-    // Reuse if already exists
     if (offer.podcast_video_url) {
-      return NextResponse.json({ 
-        success: true, 
-        videoUrl: offer.podcast_video_url,
-        reused: true 
-      });
+      return NextResponse.json({ success: true, videoUrl: offer.podcast_video_url });
     }
 
     // Build script
@@ -46,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
     script += "Let the crew review your mail! Visit OfferCrew-dot-eye-en-kay.";
 
-    // Call HeyGen using the exact working payload
+    // Call HeyGen
     const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
       method: 'POST',
       headers: {
@@ -63,19 +56,16 @@ export async function POST(request: NextRequest) {
     });
 
     const heygenData = await heygenRes.json();
-    console.log('[PODCAST] HeyGen response:', heygenData);
-
     const videoId = heygenData.data?.video_id || heygenData.video_id;
 
-    if (!videoId) {
-      return NextResponse.json({ success: false, error: 'HeyGen failed', details: heygenData });
+    if (videoId) {
+      await supabase.from('offers').update({
+        video_id: videoId,
+        podcast_status: 'generating'
+      }).eq('id', offerId);
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      videoId,
-      message: "Podcast generation started." 
-    });
+    return NextResponse.json({ success: true, videoId });
 
   } catch (err: any) {
     console.error('[PODCAST] Error:', err);

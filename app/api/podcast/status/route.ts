@@ -1,38 +1,41 @@
+// app/api/podcast/status/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
+let supabaseClient: any = null;
+const getSupabase = () => {
+  if (!supabaseClient) {
+    const { createClient } = require('@supabase/supabase-js');
+    supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return supabaseClient;
+};
+
 export async function GET(request: NextRequest) {
-  const offerId = request.nextUrl.searchParams.get('offerId');
+  try {
+    const offerId = request.nextUrl.searchParams.get('offerId');
+    if (!offerId) return NextResponse.json({ success: false, error: 'Missing offerId' });
 
-  if (!offerId) {
-    return NextResponse.json({ error: 'offerId required' }, { status: 400 });
-  }
+    const supabase = getSupabase();
+    const { data: offer } = await supabase
+      .from('offers')
+      .select('podcast_video_url, podcast_status, video_id')
+      .eq('id', offerId)
+      .single();
 
-  const supabaseUrl = 'https://uhckwrldxoifdcwwhlyq.supabase.co';
-  const supabaseAnonKey = 'sb_publishable_OfxWMUFjTA--8eEG0htRnw__d2HYLbw';
+    if (!offer) return NextResponse.json({ success: false, error: 'Offer not found' });
 
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-  const { data: offer } = await supabase
-    .from('offers')
-    .select('*')
-    .eq('id', offerId)
-    .single();
-
-  if (!offer || !offer.video_id) {
-    return NextResponse.json({ status: 'not_found' });
-  }
-
-  if (offer.podcast_video_url) {
     return NextResponse.json({
-      status: 'ready',
-      video_url: offer.podcast_video_url
+      success: true,
+      videoUrl: offer.podcast_video_url,
+      status: offer.podcast_video_url ? 'ready' : (offer.podcast_status || 'generating'),
+      videoId: offer.video_id
     });
-  }
 
-  // Poll HeyGen for status (you can call this from frontend every 5-10 seconds)
-  return NextResponse.json({
-    status: offer.podcast_status || 'generating',
-    video_id: offer.video_id
-  });
+  } catch (err: any) {
+    console.error('[PODCAST STATUS] Error:', err);
+    return NextResponse.json({ success: false, error: err.message });
+  }
 }
