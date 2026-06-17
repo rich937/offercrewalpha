@@ -91,7 +91,7 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user
     }
   };
 
-  const analyzeWithCrew = async () => {
+   const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -105,7 +105,7 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user
         method: 'POST',
         body: formData,
         headers: {
-          'x-user-id': user?.id || ''   // Critical for Supabase save
+          'x-user-id': user?.id || ''
         }
       });
 
@@ -127,18 +127,18 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user
         }
       } catch (e) {
         console.warn("[UPLOAD] JSON parse failed:", e);
+        messagesToShow = [{ type: 'system', text: result.crewResponse?.substring(0, 300) || "The Crew responded." }];
       }
 
+      console.log('[UPLOAD] Parsed messages for chat:', messagesToShow);
+
+      // Pass messages to ChatInterface
       if (onAnalysisComplete) {
         onAnalysisComplete(messagesToShow);
       }
 
+      // Refresh Previous Offers
       onUploadComplete();
-
-      // Extra safety refresh
-      setTimeout(() => {
-        onUploadComplete();
-      }, 1000);
 
     } catch (err) {
       console.error('[UPLOAD] Error:', err);
