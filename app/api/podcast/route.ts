@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, videoUrl: offer.podcast_video_url });
     }
 
-    // Build script
+    // Build Clara script
     let script = `Welcome to OfferCrew! Today we are reviewing a ${offer.lender || 'financial'} offer.\n\n`;
     if (offer.crew_conversation && Array.isArray(offer.crew_conversation)) {
       offer.crew_conversation.forEach((msg: any) => {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
     script += "Let the crew review your mail! Visit OfferCrew-dot-eye-en-kay.";
 
-    // Call HeyGen
+    // Simple working structure (no Avatar III)
     const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
       method: 'POST',
       headers: {
@@ -56,13 +56,12 @@ export async function POST(request: NextRequest) {
     });
 
     const heygenData = await heygenRes.json();
+    console.log('[PODCAST] HeyGen response:', heygenData);
+
     const videoId = heygenData.data?.video_id || heygenData.video_id;
 
     if (videoId) {
-      await supabase.from('offers').update({
-        video_id: videoId,
-        podcast_status: 'generating'
-      }).eq('id', offerId);
+      await supabase.from('offers').update({ video_id: videoId }).eq('id', offerId);
     }
 
     return NextResponse.json({ success: true, videoId });
