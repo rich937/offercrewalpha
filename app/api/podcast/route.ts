@@ -16,13 +16,10 @@ const getSupabase = () => {
 export async function POST(request: NextRequest) {
   try {
     const { offerId } = await request.json();
-    if (!offerId) {
-      return NextResponse.json({ success: false, error: "offerId is required" }, { status: 400 });
-    }
 
     const supabase = getSupabase();
 
-    // 1. Fetch the offer
+    // Fetch offer
     const { data: offer, error } = await supabase
       .from('offers')
       .select('*')
@@ -30,74 +27,63 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error || !offer) {
-      return NextResponse.json({ success: false, error: "Offer not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: 'Offer not found' });
     }
 
-    // 2. If video already exists, return it immediately
+    // Reuse existing video
     if (offer.podcast_video_url) {
-      return NextResponse.json({
-        success: true,
+      return NextResponse.json({ 
+        success: true, 
         videoUrl: offer.podcast_video_url,
-        message: "Using existing video"
+        reused: true 
       });
     }
 
-    // 3. Build a good Clara summary script (300-450 characters)
-    let script = `This is a review of a ${offer.lender} offer. `;
-    
+    // Build Clara script
+    let script = `Welcome to OfferCrew! Today we're reviewing a ${offer.lender || 'financial'} offer.\n\n`;
+
     if (offer.crew_conversation && Array.isArray(offer.crew_conversation)) {
-      const summary = offer.crew_conversation
-        .slice(0, 6)
-        .map((m: any) => m.text || m)
-        .join(". ");
-      script += summary.substring(0, 380) + "... ";
-    } else if (offer.raw_grok_response) {
-      script += offer.raw_grok_response.substring(0, 350);
+      offer.crew_conversation.forEach((msg: any) => {
+        if (msg.text) {
+          script += `${msg.speaker || 'Crew'}: ${msg.text}\n\n`;
+        }
+      });
     }
 
-    script += " Ledger gave this offer a final score. What do you think?";
+    // Your required closing line
+    script += "Let the crew review your mail! Visit OfferCrew-dot-eye-en-kay.";
 
-    // 4. Call HeyGen (using Clara avatar)
+    // Call HeyGen with Clara avatar
     const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
       method: 'POST',
       headers: {
-        'X-Api-Key': process.env.HEYGEN_API_KEY!,
+        'X-Api-Key': process.env.HEYGEN_API_KEY || '',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        avatar_id: "c1b8b344aa15421ebba93018bbf26ca0",   // ← Your Clara avatar ID
-        voice_id: "16a09e4706f74997ba4ed05ea11470f6",   // ← Clara voice
+        avatar_id: "c1b8b344aa15421ebba93018bbf26ca0",   // Your Clara avatar
+        voice_id: "16a09e4706f74997ba4ed05ea11470f6",   // Clara voice
         script: script,
-        title: `${offer.lender} Offer Review`,
-        test: false
+        title: `${offer.lender} Offer Review - OfferCrew`
       })
     });
 
     const heygenData = await heygenRes.json();
-
-    if (!heygenData.video_id) {
-      return NextResponse.json({ success: false, error: "Failed to start video generation" });
-    }
-
     const videoId = heygenData.video_id;
 
-    // 5. Save video_id immediately (so we don't regenerate)
-    await supabase
-      .from('offers')
-      .update({ 
-        video_id: videoId,
-        podcast_status: 'generating'
-      })
-      .eq('id', offerId);
+    if (!videoId) {
+      return NextResponse.json({ success: false, error: 'HeyGen generation failed' });
+    }
 
-    return NextResponse.json({
-      success: true,
-      videoId: videoId,
-      message: "Video generation started. It will be available shortly."
+    // For now return videoId. In next phase we'll poll for final URL and save it.
+    return NextResponse.json({ 
+      success: true, 
+      videoId,
+      message: "Podcast is being generated. It will appear shortly." 
     });
 
   } catch (err: any) {
-    console.error("Podcast API error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error('[PODCAST] Error:', err);
+    return NextResponse.json({ success: false, error: err.message });
   }
 }

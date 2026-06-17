@@ -59,11 +59,9 @@ export default function Dashboard() {
     else setHistory(data || []);
   };
 
-   const handleNewOffer = () => {
-  if (user) {
-    loadHistory(user.id, getSupabase());
-  }
-};
+  const handleNewOffer = () => {
+    if (user) loadHistory(user.id, getSupabase());
+  };
 
   const generatePodcast = async (offer: any) => {
     if (!offer.id) return alert("No offer ID found");
@@ -78,7 +76,7 @@ export default function Dashboard() {
       const data = await res.json();
 
       if (data.success) {
-        alert(`🎙️ Podcast generation started for ${offer.lender}!`);
+        alert(`🎙️ Podcast started for ${offer.lender}!`);
         handleNewOffer(); // refresh list
       } else {
         alert('Failed: ' + (data.error || 'Unknown error'));
@@ -150,11 +148,10 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
-     <UploadPanel 
-  onUploadComplete={handleNewOffer}
-  onAnalysisComplete={setChatMessages}   // ← Add this line
-  user={user} 
-/>
+          <UploadPanel 
+            onUploadComplete={handleNewOffer}
+            user={user} 
+          />
           
           <ChatInterface 
             chatMessages={chatMessages} 
