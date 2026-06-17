@@ -140,6 +140,8 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user
       // Refresh Previous Offers
       onUploadComplete();
 
+      
+
     } catch (err) {
       console.error('[UPLOAD] Error:', err);
       alert("Sorry, I had trouble analyzing that offer.");

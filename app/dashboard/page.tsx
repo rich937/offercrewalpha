@@ -148,10 +148,13 @@ export default function Dashboard() {
 
       {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
+         
+
           <UploadPanel 
-            onUploadComplete={handleNewOffer}
-            user={user} 
-          />
+  onUploadComplete={handleNewOffer}
+  onAnalysisComplete={setChatMessages}   // ← This line is critical
+  user={user} 
+/>
           
           <ChatInterface 
             chatMessages={chatMessages} 

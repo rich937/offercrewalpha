@@ -18,42 +18,27 @@ export async function POST(request: NextRequest) {
     const { offerId } = await request.json();
 
     const supabase = getSupabase();
-
-    // Fetch offer
-    const { data: offer, error } = await supabase
+    const { data: offer } = await supabase
       .from('offers')
       .select('*')
       .eq('id', offerId)
       .single();
 
-    if (error || !offer) {
-      return NextResponse.json({ success: false, error: 'Offer not found' });
-    }
+    if (!offer) return NextResponse.json({ success: false, error: 'Offer not found' });
 
-    // Reuse existing video
     if (offer.podcast_video_url) {
-      return NextResponse.json({ 
-        success: true, 
-        videoUrl: offer.podcast_video_url,
-        reused: true 
-      });
+      return NextResponse.json({ success: true, videoUrl: offer.podcast_video_url, reused: true });
     }
 
-    // Build Clara script
+    // Build script
     let script = `Welcome to OfferCrew! Today we're reviewing a ${offer.lender || 'financial'} offer.\n\n`;
-
     if (offer.crew_conversation && Array.isArray(offer.crew_conversation)) {
       offer.crew_conversation.forEach((msg: any) => {
-        if (msg.text) {
-          script += `${msg.speaker || 'Crew'}: ${msg.text}\n\n`;
-        }
+        if (msg.text) script += `${msg.speaker || 'Crew'}: ${msg.text}\n\n`;
       });
     }
-
-    // Your required closing line
     script += "Let the crew review your mail! Visit OfferCrew-dot-eye-en-kay.";
 
-    // Call HeyGen with Clara avatar
     const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
       method: 'POST',
       headers: {
@@ -61,7 +46,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        avatar_id: "c1b8b344aa15421ebba93018bbf26ca0",   // Your Clara avatar
+        avatar_id: "c1b8b344aa15421ebba93018bbf26ca0",   // Clara
         voice_id: "16a09e4706f74997ba4ed05ea11470f6",   // Clara voice
         script: script,
         title: `${offer.lender} Offer Review - OfferCrew`
@@ -69,17 +54,18 @@ export async function POST(request: NextRequest) {
     });
 
     const heygenData = await heygenRes.json();
-    const videoId = heygenData.video_id;
+    console.log('[PODCAST] HeyGen response:', heygenData);
+
+    const videoId = heygenData.video_id || heygenData.data?.video_id;
 
     if (!videoId) {
-      return NextResponse.json({ success: false, error: 'HeyGen generation failed' });
+      return NextResponse.json({ success: false, error: 'HeyGen failed', details: heygenData });
     }
 
-    // For now return videoId. In next phase we'll poll for final URL and save it.
     return NextResponse.json({ 
       success: true, 
       videoId,
-      message: "Podcast is being generated. It will appear shortly." 
+      message: "Podcast generation started." 
     });
 
   } catch (err: any) {
