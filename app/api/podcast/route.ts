@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
     script += "Let the crew review your mail! Visit OfferCrew-dot-eye-en-kay.";
 
-    // Call HeyGen with the working structure
+    // Call HeyGen using the exact working payload
     const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
       method: 'POST',
       headers: {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       videoId,
-      message: "Podcast generation started. Check back soon." 
+      message: "Podcast generation started." 
     });
 
   } catch (err: any) {
