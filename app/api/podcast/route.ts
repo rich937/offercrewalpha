@@ -18,20 +18,27 @@ export async function POST(request: NextRequest) {
     const { offerId } = await request.json();
 
     const supabase = getSupabase();
-    const { data: offer } = await supabase
+    const { data: offer, error } = await supabase
       .from('offers')
       .select('*')
       .eq('id', offerId)
       .single();
 
-    if (!offer) return NextResponse.json({ success: false, error: 'Offer not found' });
+    if (error || !offer) {
+      return NextResponse.json({ success: false, error: 'Offer not found' });
+    }
 
+    // Reuse if already exists
     if (offer.podcast_video_url) {
-      return NextResponse.json({ success: true, videoUrl: offer.podcast_video_url, reused: true });
+      return NextResponse.json({ 
+        success: true, 
+        videoUrl: offer.podcast_video_url,
+        reused: true 
+      });
     }
 
     // Build script
-    let script = `Welcome to OfferCrew! Today we're reviewing a ${offer.lender || 'financial'} offer.\n\n`;
+    let script = `Welcome to OfferCrew! Today we are reviewing a ${offer.lender || 'financial'} offer.\n\n`;
     if (offer.crew_conversation && Array.isArray(offer.crew_conversation)) {
       offer.crew_conversation.forEach((msg: any) => {
         if (msg.text) script += `${msg.speaker || 'Crew'}: ${msg.text}\n\n`;
@@ -39,6 +46,7 @@ export async function POST(request: NextRequest) {
     }
     script += "Let the crew review your mail! Visit OfferCrew-dot-eye-en-kay.";
 
+    // Call HeyGen with the working structure
     const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
       method: 'POST',
       headers: {
@@ -46,17 +54,18 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        avatar_id: "c1b8b344aa15421ebba93018bbf26ca0",   // Clara
-        voice_id: "16a09e4706f74997ba4ed05ea11470f6",   // Clara voice
-        script: script,
-        title: `${offer.lender} Offer Review - OfferCrew`
+        "type": "avatar",
+        "avatar_id": "c1b8b344aa15421ebba93018bbf26ca0",
+        "script": script,
+        "voice_id": "16a09e4706f74997ba4ed05ea11470f6",
+        "aspect_ratio": "16:9"
       })
     });
 
     const heygenData = await heygenRes.json();
     console.log('[PODCAST] HeyGen response:', heygenData);
 
-    const videoId = heygenData.video_id || heygenData.data?.video_id;
+    const videoId = heygenData.data?.video_id || heygenData.video_id;
 
     if (!videoId) {
       return NextResponse.json({ success: false, error: 'HeyGen failed', details: heygenData });
@@ -65,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       videoId,
-      message: "Podcast generation started." 
+      message: "Podcast generation started. Check back soon." 
     });
 
   } catch (err: any) {
