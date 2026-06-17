@@ -1,14 +1,14 @@
 // app/dashboard/components/UploadPanel.tsx
 'use client';
-
 import { useState } from 'react';
 
 interface UploadPanelProps {
   onUploadComplete: () => void;
-  onAnalysisComplete?: (messages: any[]) => void;   // ← NEW
+  onAnalysisComplete?: (messages: any[]) => void;
+  user: any;                    // Required for saving to Supabase
 }
 
-export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: UploadPanelProps) {
+export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user }: UploadPanelProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -91,47 +91,63 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
     }
   };
 
- const analyzeWithCrew = async () => {
-  if (selectedFiles.length === 0) return;
+  const analyzeWithCrew = async () => {
+    if (selectedFiles.length === 0) return;
 
-  setUploading(true);
-  console.log('[UPLOAD] Starting analysis with', selectedFiles.length, 'files');
+    setUploading(true);
+    console.log('[UPLOAD] Starting analysis with', selectedFiles.length, 'files');
 
-  try {
-    const formData = new FormData();
-    selectedFiles.forEach(f => formData.append('files', f));
+    try {
+      const formData = new FormData();
+      selectedFiles.forEach(f => formData.append('files', f));
 
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'x-user-id': user?.id || ''   // ← THIS IS THE IMPORTANT LINE
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'x-user-id': user?.id || ''   // Critical for Supabase save
+        }
+      });
+
+      const result = await res.json();
+      console.log('[UPLOAD] /api/analyze response:', result);
+
+      let messagesToShow: any[] = [];
+      try {
+        let raw = result.crewResponse || "{}";
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) raw = jsonMatch[0];
+        const parsed = JSON.parse(raw);
+
+        if (parsed.messages && Array.isArray(parsed.messages)) {
+          messagesToShow = parsed.messages.map((item: any) => ({
+            type: (item.speaker || 'system').toLowerCase(),
+            text: (item.text || String(item)).trim()
+          }));
+        }
+      } catch (e) {
+        console.warn("[UPLOAD] JSON parse failed:", e);
       }
-    });
 
-    const result = await res.json();
-    console.log('[UPLOAD] /api/analyze response:', result);
+      if (onAnalysisComplete) {
+        onAnalysisComplete(messagesToShow);
+      }
 
-    // ... rest of your parsing code stays the same ...
+      onUploadComplete();
 
-    if (onAnalysisComplete) {
-      onAnalysisComplete(messagesToShow);
+      // Extra safety refresh
+      setTimeout(() => {
+        onUploadComplete();
+      }, 1000);
+
+    } catch (err) {
+      console.error('[UPLOAD] Error:', err);
+      alert("Sorry, I had trouble analyzing that offer.");
     }
 
-    onUploadComplete();
-
-    setTimeout(() => {
-      onUploadComplete();
-    }, 800);
-
-  } catch (err) {
-    console.error('[UPLOAD] Error:', err);
-    alert("Sorry, I had trouble analyzing that offer.");
-  }
-
-  setSelectedFiles([]);
-  setUploading(false);
-};
+    setSelectedFiles([]);
+    setUploading(false);
+  };
 
   return (
     <div className="w-80 flex-shrink-0">
@@ -141,13 +157,13 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete }: Up
         <p className="text-amber-700">Redact name, address, and codes with a Sharpie before uploading.</p>
       </div>
 
-      <input 
-        id="fileInput" 
-        type="file" 
-        accept="image/*,application/pdf" 
-        multiple 
-        className="hidden" 
-        onChange={handleFileSelect} 
+      <input
+        id="fileInput"
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        onChange={handleFileSelect}
       />
 
       <button
