@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'blog' | 'about'>('dashboard');
   const [chatMessages, setChatMessages] = useState<any[]>([
-    { type: 'Ledger', text: 'The Crew is ready. Upload mail to begin the roast!' }
+    { type: 'system', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -119,13 +119,13 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-10 text-lg">
             <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Dashboard</button>
-            <button onClick={() => setActiveTab('blog')} className={activeTab === 'blog' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Blog</button>
+            <button onClick={() => setActiveTab('blog')} className={activeTab === 'blog' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Blog / Podcasts</button>
             <button onClick={() => setActiveTab('about')} className={activeTab === 'about' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>About</button>
           </div>
         </div>
       </nav>
 
-            {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && (
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
           <UploadPanel 
             onUploadComplete={handleNewOffer}
@@ -148,23 +148,6 @@ export default function Dashboard() {
             onGeneratePodcast={generatePodcast}
             onWatchPodcast={openVideoViewer}
           />
-        </div>
-      )}
-
-      {activeTab === 'blog' && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <iframe 
-            src="/blog" 
-            className="w-full h-[calc(100vh-180px)] border-0 rounded-3xl"
-            title="OfferCrew Blog"
-          />
-        </div>
-      )}
-
-      {activeTab === 'about' && (
-        <div className="max-w-4xl mx-auto px-6 py-12 text-center">
-          <h2 className="text-4xl font-bold mb-8">About OfferCrew</h2>
-          <p className="text-lg text-gray-600">Coming soon...</p>
         </div>
       )}
 
