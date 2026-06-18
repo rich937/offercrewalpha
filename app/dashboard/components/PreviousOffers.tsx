@@ -13,14 +13,23 @@ export default function PreviousOffers({ history, onGeneratePodcast, onWatchPodc
   const [loadingOfferId, setLoadingOfferId] = useState<string | null>(null);
   const [pollingOfferIds, setPollingOfferIds] = useState<Set<string>>(new Set());
 
+  // Auto-start polling for any offer that has video_id but no final URL
+  useEffect(() => {
+    const needsPolling = history
+      .filter(offer => offer.video_id && !offer.podcast_video_url)
+      .map(offer => offer.id);
+
+    setPollingOfferIds(new Set(needsPolling));
+  }, [history]);
+
   const handleGenerate = async (offer: any) => {
     setLoadingOfferId(offer.id);
     await onGeneratePodcast(offer);
     setLoadingOfferId(null);
-    setPollingOfferIds(prev => new Set(prev).add(offer.id)); // Start polling
+    setPollingOfferIds(prev => new Set(prev).add(offer.id));
   };
 
-  // Auto-polling for video readiness
+  // Main polling
   useEffect(() => {
     if (pollingOfferIds.size === 0) return;
 
@@ -34,16 +43,16 @@ export default function PreviousOffers({ history, onGeneratePodcast, onWatchPodc
 
           if (data.success && data.videoUrl) {
             stillPolling.delete(offerId);
-            // Refresh history to show Watch button
+            // Refresh the whole page to update UI
             window.location.reload();
           }
         } catch (e) {
-          console.error(e);
+          console.error('Polling error for', offerId, e);
         }
       }
 
       setPollingOfferIds(stillPolling);
-    }, 5000); // Poll every 5 seconds
+    }, 6000); // Poll every 6 seconds
 
     return () => clearInterval(interval);
   }, [pollingOfferIds]);
@@ -57,18 +66,17 @@ export default function PreviousOffers({ history, onGeneratePodcast, onWatchPodc
         )}
 
         {history.map((offer, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 cursor-pointer transition-all">
+          <div key={offer.id || i} className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-cyan-400 transition-all">
             <p className="font-semibold text-lg">{offer.lender}</p>
             <p className="text-sm text-gray-500">#{String(offer.sequence_number || i + 1).padStart(6, '0')}</p>
-            <p className="text-xs text-gray-400 mt-1">{offer.file_count || 1} file(s)</p>
 
             <div className="mt-4 flex gap-3">
               <button 
                 onClick={() => handleGenerate(offer)}
-                disabled={loadingOfferId === offer.id || pollingOfferIds.has(offer.id)}
+                disabled={loadingOfferId === offer.id}
                 className="flex-1 py-2.5 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:brightness-110 disabled:opacity-50"
               >
-                {loadingOfferId === offer.id || pollingOfferIds.has(offer.id) ? "🎙️ Generating..." : "🎙️ Generate Podcast"}
+                {loadingOfferId === offer.id ? "🎙️ Generating..." : "🎙️ Generate Podcast"}
               </button>
               
               {offer.podcast_video_url && (

@@ -21,21 +21,43 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabase();
     const { data: offer } = await supabase
       .from('offers')
-      .select('podcast_video_url, podcast_status, video_id')
+      .select('video_id, podcast_video_url, podcast_status')
       .eq('id', offerId)
       .single();
 
-    if (!offer) return NextResponse.json({ success: false, error: 'Offer not found' });
+    if (!offer || !offer.video_id) {
+      return NextResponse.json({ success: false, error: 'No video_id found' });
+    }
 
-    return NextResponse.json({
-      success: true,
-      videoUrl: offer.podcast_video_url,
-      status: offer.podcast_video_url ? 'ready' : (offer.podcast_status || 'generating'),
-      videoId: offer.video_id
+    if (offer.podcast_video_url) {
+      return NextResponse.json({ success: true, videoUrl: offer.podcast_video_url, status: 'ready' });
+    }
+
+    // Poll HeyGen
+    const heygenRes = await fetch(`https://api.heygen.com/v3/videos/${offer.video_id}`, {
+      headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY || '' }
+    });
+
+    const heygenData = await heygenRes.json();
+    const videoData = heygenData.data || heygenData;
+
+    if (videoData.status === 'completed' && videoData.video_url) {
+      await supabase.from('offers').update({
+        podcast_video_url: videoData.video_url,
+        podcast_status: 'ready'
+      }).eq('id', offerId);
+
+      return NextResponse.json({ success: true, videoUrl: videoData.video_url, status: 'ready' });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      status: videoData.status || 'generating',
+      videoUrl: null 
     });
 
   } catch (err: any) {
-    console.error('[PODCAST STATUS] Error:', err);
+    console.error('[STATUS] Error:', err);
     return NextResponse.json({ success: false, error: err.message });
   }
 }
