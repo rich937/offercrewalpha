@@ -65,9 +65,7 @@ export default function Home() {
             >
               Sign Up
             </Link>
-            <button className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/30 text-white rounded-2xl font-semibold hover:bg-white/20 text-lg">
-              Free Demo
-            </button>
+           
           </div>
         </div>
       </section>
