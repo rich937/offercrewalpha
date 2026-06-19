@@ -1,38 +1,30 @@
 // app/api/podcast/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-// Polling helper with detailed logging
+// Polling helper for immediate generation
 async function pollVideoStatus(videoId: string, maxAttempts = 30) {
   console.log(`🔍 Starting poll for video: ${videoId}`);
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await fetch(`https://api.heygen.com/v3/videos/${videoId}`, {
-      headers: {
-        'X-Api-Key': process.env.HEYGEN_API_KEY || '',
-      },
+      headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY || '' },
     });
 
     const data = await res.json();
-    console.log(`📊 Poll ${attempt + 1}/${maxAttempts} - Status:`, data.data?.status || data.status);
-    console.log(`📊 Full response snippet:`, JSON.stringify(data, null, 2).substring(0, 800) + "...");
-
     const status = data.data?.status || data.status;
     const videoUrl = data.data?.video_url || data.video_url;
 
+    console.log(`📊 Poll ${attempt + 1}/${maxAttempts} - Status: ${status}`);
+
     if (status === 'completed' || status === 'success') {
-      console.log(`✅ Video completed! URL found: ${videoUrl || 'NOT FOUND'}`);
+      console.log(`✅ Video completed! URL: ${videoUrl}`);
       return data.data || data;
     }
 
-    if (status === 'failed') {
-      console.error("❌ Video generation failed on HeyGen");
-      throw new Error('Video generation failed');
-    }
+    if (status === 'failed') throw new Error('Video generation failed');
 
-    await new Promise(resolve => setTimeout(resolve, 4000)); // 4 seconds
+    await new Promise(resolve => setTimeout(resolve, 4000));
   }
-
-  console.error("⏰ Polling timeout");
   throw new Error('Video polling timeout');
 }
 
@@ -50,8 +42,6 @@ const getSupabase = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log(`🚀 [PODCAST] Starting for offerId:`, request.body ? 'body present' : 'no body');
-
     const { offerId } = await request.json();
     console.log(`🚀 [PODCAST] Processing offerId: ${offerId}`);
 
@@ -93,77 +83,65 @@ ${offer.crew_conversation?.map((msg: any) => `${msg.speaker}: ${msg.text}`).join
       }),
     });
 
-    if (!grokRes.ok) {
-      const errText = await grokRes.text();
-      console.error("❌ Grok API error:", grokRes.status, errText);
-    }
-
     const grokData = await grokRes.json();
     let script = grokData.choices?.[0]?.message?.content?.trim() || summarizationPrompt;
 
-    console.log("🎙️ FINAL SCRIPT LENGTH:", script.length, "characters");
-    console.log("🎙️ FINAL SCRIPT PREVIEW:", script.substring(0, 300) + "...");
+    console.log("🎙️ FINAL SCRIPT LENGTH:", script.length);
 
-    // === HEYGEN VIDEO GENERATION ===
-    const heygenRes = await fetch('https://api.heygen.com/v3/videos', {
+    // === HEYGEN TEMPLATE (Avatar III) ===
+    const heygenRes = await fetch('https://api.heygen.com/v2/template/14fcd4b10d7541bb9a2cbc52c269fc8e/generate', {
       method: 'POST',
       headers: {
         'X-Api-Key': process.env.HEYGEN_API_KEY || '',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        "type": "avatar",
-        "avatar_id": "c1b8b344aa15421ebba93018bbf26ca0",
-        "script": script,
-        "voice_id": "16a09e4706f74997ba4ed05ea11470f6",
-        "aspect_ratio": "16:9"
+        variables: {
+          podcast_script: {
+            name: "podcast_script",
+            type: "text",
+            properties: {
+              type: "avatar",
+              character_id: "c1b8b344aa15421ebba93018bbf26ca0",
+              content: script,
+              voice_id: "16a09e4706f74997ba4ed05ea11470f6"
+            }
+          }
+        },
+        engine: "avatar_iii"
       })
     });
 
     if (!heygenRes.ok) {
       const errorText = await heygenRes.text();
-      throw new Error(`HeyGen creation failed: ${heygenRes.status} - ${errorText}`);
+      throw new Error(`HeyGen failed: ${heygenRes.status} - ${errorText}`);
     }
 
     const heygenData = await heygenRes.json();
     const videoId = heygenData.data?.video_id || heygenData.video_id;
 
-    if (!videoId) {
-      throw new Error('No video_id returned from HeyGen');
-    }
+    if (!videoId) throw new Error('No video_id returned from HeyGen');
 
-    console.log(`🎥 Video created successfully. videoId: ${videoId}`);
+    console.log(`🎥 Video created with Avatar III. videoId: ${videoId}`);
 
     await supabase.from('offers').update({ 
       video_id: videoId,
       podcast_status: 'generating'
     }).eq('id', offerId);
 
-    // === POLL FOR COMPLETED VIDEO ===
-    try {
-      const videoData = await pollVideoStatus(videoId);
-      console.log("📥 Full videoData from poll:", JSON.stringify(videoData, null, 2));
+    // Inline poll for immediate result
+    const videoData = await pollVideoStatus(videoId);
+    const videoUrl = videoData.video_url || videoData.data?.video_url;
 
-      const videoUrl = videoData.video_url || videoData.data?.video_url;
-
-      if (videoUrl) {
-        await supabase.from('offers').update({
-          podcast_video_url: videoUrl,
-          podcast_status: 'completed'
-        }).eq('id', offerId);
-
-        console.log("✅ SUCCESS: Video URL saved to Supabase:", videoUrl);
-      } else {
-        console.warn("⚠️ Completed but no video_url found");
-      }
-    } catch (pollError: any) {
-      console.error("❌ Polling failed:", pollError);
-      await supabase.from('offers').update({ podcast_status: 'failed' }).eq('id', offerId);
+    if (videoUrl) {
+      await supabase.from('offers').update({
+        podcast_video_url: videoUrl,
+        podcast_status: 'completed'
+      }).eq('id', offerId);
+      console.log("✅ SUCCESS: Video URL saved:", videoUrl);
     }
 
-    console.log(`✅ [PODCAST] Finished processing offer ${offerId}`);
-
-    return NextResponse.json({ success: true, videoId });
+    return NextResponse.json({ success: true, videoId, videoUrl });
 
   } catch (err: any) {
     console.error('[PODCAST] Error:', err);
@@ -171,16 +149,16 @@ ${offer.crew_conversation?.map((msg: any) => `${msg.speaker}: ${msg.text}`).join
   }
 }
 
-// Background sync every 60 seconds (placed outside the route handler)
+// ==================== BACKGROUND SYNC ====================
 let backgroundSyncStarted = false;
 
 if (!backgroundSyncStarted) {
   backgroundSyncStarted = true;
-  console.log("🔄 Starting background HeyGen sync (every 60 seconds)...");
+  console.log("🔄 Starting background HeyGen sync (every 45 seconds)...");
 
   setInterval(async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/podcast/sync', { 
+      const res = await fetch('https://fuzzy-journey-wrw67j477wqr2vj75-3000.app.github.dev/api/podcast/sync', { 
         method: 'GET',
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
@@ -195,5 +173,5 @@ if (!backgroundSyncStarted) {
     } catch (err) {
       // Silent in background
     }
-  }, 60 * 1000);
+  }, 45 * 1000);
 }

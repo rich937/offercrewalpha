@@ -25,7 +25,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'blog' | 'about'>('dashboard');
   
   const [chatMessages, setChatMessages] = useState<any[]>([
-    { type: 'system', text: 'The Crew is ready. Upload mail to begin the roast!' }
+    { type: 'Ledger', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
   const [currentOfferId, setCurrentOfferId] = useState<string | null>(null); // NEW
 
@@ -130,7 +130,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-10 text-lg">
             <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Dashboard</button>
-            <button onClick={() => setActiveTab('blog')} className={activeTab === 'blog' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Blog / Podcasts</button>
+            <button onClick={() => setActiveTab('blog')} className={activeTab === 'blog' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>Blog</button>
             <button onClick={() => setActiveTab('about')} className={activeTab === 'about' ? 'font-semibold border-b-2 border-black pb-1' : 'text-gray-600 hover:text-black'}>About</button>
           </div>
         </div>

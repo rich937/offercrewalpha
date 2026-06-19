@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+// app/api/podcast/sync/route.ts
+import { NextResponse } from 'next/server';
 
 let supabaseClient: any = null;
 const getSupabase = () => {
@@ -16,11 +17,7 @@ async function pollVideoStatus(videoId: string) {
   const res = await fetch(`https://api.heygen.com/v3/videos/${videoId}`, {
     headers: { 'X-Api-Key': process.env.HEYGEN_API_KEY || '' },
   });
-
-  if (!res.ok) {
-    throw new Error(`HeyGen API error: ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(`HeyGen error ${res.status}`);
   const data = await res.json();
   return data.data || data;
 }
@@ -36,18 +33,17 @@ export async function GET() {
       .is('podcast_video_url', null)
       .in('podcast_status', ['generating', 'ready']);
 
-    if (!pendingOffers || pendingOffers.length === 0) {
-      console.log("🔄 Sync: No pending videos found.");
-      return NextResponse.json({ success: true, message: 'No pending videos to sync', synced: 0 });
+    if (!pendingOffers?.length) {
+      return NextResponse.json({ success: true, synced: 0 });
     }
 
-    console.log(`🔄 Found ${pendingOffers.length} offers to sync`);
+    console.log(`🔄 Background sync: checking ${pendingOffers.length} videos...`);
 
     let successCount = 0;
 
     for (const offer of pendingOffers) {
       try {
-        const videoData = await pollVideoStatus(offer.video_id);
+        const videoData = await pollVideoStatus(offer.video_id!);
         const videoUrl = videoData.video_url || videoData.data?.video_url;
 
         if (videoUrl) {
@@ -56,22 +52,15 @@ export async function GET() {
             podcast_status: 'completed'
           }).eq('id', offer.id);
 
-          console.log(`✅ Synced offer ${offer.id}: ${videoUrl}`);
+          console.log(`✅ Synced ${offer.id}`);
           successCount++;
-        } else {
-          console.warn(`⚠️ No video_url for offer ${offer.id}`);
         }
-      } catch (err: any) {
-        console.error(`❌ Failed to sync offer ${offer.id}:`, err.message);
+      } catch (err) {
+        console.error(`Sync failed for ${offer.id}`, err);
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      synced: successCount,
-      total: pendingOffers.length 
-    });
-
+    return NextResponse.json({ success: true, synced: successCount });
   } catch (err: any) {
     console.error('Sync error:', err);
     return NextResponse.json({ success: false, error: err.message });
