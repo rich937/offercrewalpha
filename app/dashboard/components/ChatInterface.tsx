@@ -11,6 +11,7 @@ interface ChatInterfaceProps {
   isResponding: boolean;
   setIsResponding: React.Dispatch<React.SetStateAction<boolean>>;
   user: any;
+  currentOfferId: string | null;        // ← NEW
 }
 
 export default function ChatInterface({
@@ -21,6 +22,7 @@ export default function ChatInterface({
   isResponding,
   setIsResponding,
   user,
+  currentOfferId,                       // ← NEW
 }: ChatInterfaceProps) {
 
   const getIconPath = (type: string) => {
@@ -45,7 +47,7 @@ export default function ChatInterface({
     setIsResponding(true);
 
     // Clara's quick response
-    setChatMessages(prev => [...prev, { type: 'clara', text: "One sec..." }]);
+    setChatMessages(prev => [...prev, { type: 'clara', text: "One sec, checking the offer..." }]);
 
     try {
       const res = await fetch('/api/chat', {
@@ -53,7 +55,8 @@ export default function ChatInterface({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: question,
-          recentOfferContext: "Current offer context"
+          offerId: currentOfferId,
+          userId: user?.id
         })
       });
 
@@ -61,7 +64,7 @@ export default function ChatInterface({
 
       let messagesToShow: any[] = [];
       try {
-        const jsonMatch = data.crewResponse?.match(/\[[\s\S]*\]/) || data.crewResponse?.match(/\{[\s\S]*\}/);
+        const jsonMatch = data.crewResponse?.match(/\[[\s\S]*\]/);
         const jsonStr = jsonMatch ? jsonMatch[0] : data.crewResponse;
         const parsed = JSON.parse(jsonStr);
 
@@ -75,15 +78,20 @@ export default function ChatInterface({
         console.warn("Chat JSON parse failed", e);
       }
 
-      const cleaned = messagesToShow.filter(m => m.text.length > 3);
+      const cleaned = messagesToShow.filter(m => m.text && m.text.length > 3);
       if (cleaned.length > 0) {
         setChatMessages(prev => [...prev, ...cleaned]);
+      } else {
+        setChatMessages(prev => [...prev, {
+          type: 'ledger',
+          text: "I couldn't get a clear response from the crew. Try asking again."
+        }]);
       }
     } catch (err) {
       console.error(err);
       setChatMessages(prev => [...prev, {
         type: 'ledger',
-        text: "Sorry, the offer doesn't give us enough detail to answer that."
+        text: "Sorry, I'm having trouble connecting to the crew right now."
       }]);
     }
 
@@ -99,37 +107,37 @@ export default function ChatInterface({
             <img src="/logo.png" alt="OfferCrew" className="h-9" />
           </div>
 
-       {/* Chat Messages */}
-<div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
-  {chatMessages.map((msg, i) => {
-    const displayText = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text || msg);
-    return (
-      <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'items-start gap-3'}`}>
-        {msg.type === 'user' ? (
-          <div className="w-11 h-11 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-bold mt-1 flex-shrink-0">
-            {getUserInitial()}
-          </div>
-        ) : (
-          <img
-            src={getIconPath(msg.type)}
-            alt={msg.type}
-            className="w-11 h-11 rounded-2xl mt-1 flex-shrink-0"
-          />
-        )}
+          {/* Chat Messages */}
+          <div className="flex-1 p-6 overflow-y-auto bg-gray-50 space-y-6" style={{ maxHeight: '520px' }}>
+            {chatMessages.map((msg, i) => {
+              const displayText = typeof msg.text === 'string' ? msg.text : JSON.stringify(msg.text || msg);
+              return (
+                <div key={i} className={`flex ${msg.type === 'user' ? 'justify-end' : 'items-start gap-3'}`}>
+                  {msg.type === 'user' ? (
+                    <div className="w-11 h-11 bg-cyan-600 text-white rounded-2xl flex items-center justify-center font-bold mt-1 flex-shrink-0">
+                      {getUserInitial()}
+                    </div>
+                  ) : (
+                    <img
+                      src={getIconPath(msg.type)}
+                      alt={msg.type}
+                      className="w-11 h-11 rounded-2xl mt-1 flex-shrink-0"
+                    />
+                  )}
 
-        <div className="max-w-[78%]">
-          <div className={`text-sm font-semibold mb-1 px-1 ${msg.type === 'user' ? 'text-right text-cyan-600' : 'text-cyan-600'}`}>
-            {msg.type === 'user' ? (msg.username || 'You') : msg.type.charAt(0).toUpperCase() + msg.type.slice(1)}
+                  <div className="max-w-[78%]">
+                    <div className={`text-sm font-semibold mb-1 px-1 ${msg.type === 'user' ? 'text-right text-cyan-600' : 'text-cyan-600'}`}>
+                      {msg.type === 'user' ? (msg.username || 'You') : msg.type.charAt(0).toUpperCase() + msg.type.slice(1)}
+                    </div>
+                    <div className={`p-4 rounded-3xl shadow-sm ${msg.type === 'user' ? 'bg-blue-100' : 'bg-white'}`}>
+                      {displayText}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {isResponding && <div className="text-gray-400 italic">Crew is thinking...</div>}
           </div>
-          <div className={`p-4 rounded-3xl shadow-sm ${msg.type === 'user' ? 'bg-blue-100' : 'bg-white'}`}>
-            {displayText}
-          </div>
-        </div>
-      </div>
-    );
-  })}
-  {isResponding && <div className="text-gray-400 italic">Crew is thinking...</div>}
-</div>
 
           {/* Input Area */}
           <div className="border-t p-4 bg-white">
@@ -144,12 +152,13 @@ export default function ChatInterface({
               />
               <button
                 onClick={sendUserMessage}
-                disabled={isResponding}
+                disabled={isResponding || !currentOfferId}
                 className="px-8 bg-black text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50"
               >
                 Send
               </button>
             </div>
+            {!currentOfferId && <p className="text-xs text-gray-500 text-center mt-2">Upload an offer first to chat</p>}
           </div>
         </div>
       </div>

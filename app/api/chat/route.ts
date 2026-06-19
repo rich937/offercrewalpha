@@ -3,24 +3,52 @@ import REFERENCE_GUIDE from '../../lib/reference-guide';
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, recentOfferContext } = await request.json();
+    const { message, offerId, userId } = await request.json();
 
-     const systemPrompt = `You are the OfferCrew. The user just asked: "${message}"
+    console.log('[CHAT] Request received:', { message, offerId, hasUserId: !!userId });
 
-Here is the full context from the MOST RECENT uploaded offer:
-${recentOfferContext || "No recent offer available."}
+    if (!offerId) {
+      return NextResponse.json({ 
+        success: false, 
+        crewResponse: '[{"speaker":"Ledger","text":"Please upload an offer first."}]' 
+      });
+    }
+
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const { data: offer } = await supabase
+      .from('offers')
+      .select('*')
+      .eq('id', offerId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!offer) {
+      return NextResponse.json({ success: false, error: "Offer not found" });
+    }
+
+    const systemPrompt = `You are the OfferCrew — four lively robots: Ledger (serious analyst), Shade (sarcastic), Spark (wild comedian), Clara (patient teacher).
+
+Current Offer Context:
+Lender: ${offer.lender}
+Raw Analysis: ${offer.raw_grok_response?.substring(0, 800) || "No raw data"}
+
+User Question: "${message}"
 
 ${REFERENCE_GUIDE}
 
-Important:
-- Always use the details from the most recent offer to answer.
-- If the offer clearly states something (e.g. max loan amount is $3,000), use that exact information.
-- Clara starts with one short "One sec..." or "Let me check the offer...".
-- Then have natural banter.
-- If truly not enough info, Ledger can say so — but only as last resort.
+MANDATORY: Respond **ONLY** with a valid JSON array like this:
+[
+  {"speaker": "Clara", "text": "One sec..."},
+  {"speaker": "Ledger", "text": "..."},
+  ...
+]
 
-Respond **ONLY** with a valid JSON array.`;
-
+Make it a fun, natural group conversation. Use real details from the offer.`;
 
     const grokRes = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -31,21 +59,26 @@ Respond **ONLY** with a valid JSON array.`;
       body: JSON.stringify({
         model: "grok-3",
         messages: [{ role: "user", content: systemPrompt }],
-        temperature: 0.85,
+        temperature: 0.75,
         max_tokens: 1200,
       }),
     });
 
     const data = await grokRes.json();
-    const crewResponse = data.choices?.[0]?.message?.content || '[]';
+    let crewResponse = data.choices?.[0]?.message?.content || '[]';
 
-    return NextResponse.json({ success: true, crewResponse });
+    console.log('[CHAT] Grok raw response length:', crewResponse.length);
+
+    return NextResponse.json({ 
+      success: true, 
+      crewResponse 
+    });
 
   } catch (error) {
     console.error('[CHAT] Error:', error);
     return NextResponse.json({ 
       success: false, 
-      crewResponse: '[]' 
+      crewResponse: '[{"speaker":"Ledger","text":"Sorry, the crew is having connection issues right now."}]' 
     });
   }
 }

@@ -4,8 +4,8 @@ import { useState } from 'react';
 
 interface UploadPanelProps {
   onUploadComplete: () => void;
-  onAnalysisComplete?: (messages: any[]) => void;
-  user: any;                    // Required for saving to Supabase
+  onAnalysisComplete?: (messages: any[], offerId?: string) => void;  // Updated
+  user: any;
 }
 
 export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user }: UploadPanelProps) {
@@ -91,7 +91,7 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user
     }
   };
 
-   const analyzeWithCrew = async () => {
+  const analyzeWithCrew = async () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
@@ -132,15 +132,14 @@ export default function UploadPanel({ onUploadComplete, onAnalysisComplete, user
 
       console.log('[UPLOAD] Parsed messages for chat:', messagesToShow);
 
-      // Pass messages to ChatInterface
+      // Pass messages + offerId to ChatInterface
       if (onAnalysisComplete) {
-        onAnalysisComplete(messagesToShow);
+        onAnalysisComplete(messagesToShow, result.offerId);   // ← Updated
+        
       }
 
       // Refresh Previous Offers
       onUploadComplete();
-
-      
 
     } catch (err) {
       console.error('[UPLOAD] Error:', err);

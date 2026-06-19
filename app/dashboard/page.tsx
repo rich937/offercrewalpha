@@ -23,9 +23,12 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'blog' | 'about'>('dashboard');
+  
   const [chatMessages, setChatMessages] = useState<any[]>([
     { type: 'system', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
+  const [currentOfferId, setCurrentOfferId] = useState<string | null>(null); // NEW
+
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isResponding, setIsResponding] = useState(false);
@@ -56,6 +59,14 @@ export default function Dashboard() {
     else setHistory(data || []);
   };
 
+   const handleAnalysisComplete = (messages: any[], offerId?: string) => {
+    setChatMessages(messages);
+    if (offerId) {
+      setCurrentOfferId(offerId);
+      console.log('[DASHBOARD] Set current offer ID:', offerId); // debug
+    }
+  };
+
   const handleNewOffer = () => {
     if (user) loadHistory(user.id, getSupabase());
   };
@@ -73,7 +84,7 @@ export default function Dashboard() {
 
       if (data.success) {
         alert(`🎙️ Podcast generation started for ${offer.lender}!`);
-        handleNewOffer(); // Trigger refresh + polling
+        handleNewOffer();
       } else {
         alert('Failed: ' + (data.error || 'Unknown error'));
       }
@@ -129,7 +140,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
           <UploadPanel 
             onUploadComplete={handleNewOffer}
-            onAnalysisComplete={setChatMessages}
+            onAnalysisComplete={handleAnalysisComplete}   // Updated
             user={user} 
           />
           
@@ -141,6 +152,7 @@ export default function Dashboard() {
             isResponding={isResponding}
             setIsResponding={setIsResponding}
             user={user}
+            currentOfferId={currentOfferId}               // NEW
           />
           
           <PreviousOffers 
