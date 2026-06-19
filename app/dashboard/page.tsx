@@ -6,6 +6,7 @@ import Link from 'next/link';
 import UploadPanel from './components/UploadPanel';
 import ChatInterface from './components/ChatInterface';
 import PreviousOffers from './components/PreviousOffers';
+import tracker from '../lib/openreplay';   // ← Add this import
 
 let supabaseClient: any = null;
 const getSupabase = () => {
@@ -27,12 +28,19 @@ export default function Dashboard() {
   const [chatMessages, setChatMessages] = useState<any[]>([
     { type: 'Ledger', text: 'The Crew is ready. Upload mail to begin the roast!' }
   ]);
-  const [currentOfferId, setCurrentOfferId] = useState<string | null>(null); // NEW
+  const [currentOfferId, setCurrentOfferId] = useState<string | null>(null);
 
   const [history, setHistory] = useState<any[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isResponding, setIsResponding] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  // Initialize OpenReplay
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      tracker.start();
+    }
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -59,11 +67,10 @@ export default function Dashboard() {
     else setHistory(data || []);
   };
 
-   const handleAnalysisComplete = (messages: any[], offerId?: string) => {
+  const handleAnalysisComplete = (messages: any[], offerId?: string) => {
     setChatMessages(messages);
     if (offerId) {
       setCurrentOfferId(offerId);
-      console.log('[DASHBOARD] Set current offer ID:', offerId); // debug
     }
   };
 
@@ -140,7 +147,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-6 py-8 flex gap-8 h-[calc(100vh-180px)]">
           <UploadPanel 
             onUploadComplete={handleNewOffer}
-            onAnalysisComplete={handleAnalysisComplete}   // Updated
+            onAnalysisComplete={handleAnalysisComplete}
             user={user} 
           />
           
@@ -152,7 +159,7 @@ export default function Dashboard() {
             isResponding={isResponding}
             setIsResponding={setIsResponding}
             user={user}
-            currentOfferId={currentOfferId}               // NEW
+            currentOfferId={currentOfferId}
           />
           
           <PreviousOffers 
